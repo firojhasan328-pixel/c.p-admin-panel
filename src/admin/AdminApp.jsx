@@ -23,12 +23,10 @@ import RecycleBin from './pages/RecycleBin';
 function ProtectedRoute({ children }) {
   const { isAuthenticated, loading } = useAdmin();
   
-  // লোডিং চলাকালীন কিছু দেখান
   if (loading) {
     return <div style={{textAlign: 'center', padding: '50px'}}>⏳ লোড হচ্ছে...</div>;
   }
   
-  // অথেনটিকেটেড না হলে লগইন পেজে রিডাইরেক্ট
   if (!isAuthenticated) {
     console.log('🔒 Not authenticated, redirecting to login');
     return <Navigate to="/login" replace />;
