@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AdminProvider, useAdmin } from '../context/AdminContext';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
+import AdminLayout from './components/AdminLayout';
 import HomepageEditor from './pages/HomepageEditor';
 import TeachersManager from './pages/TeachersManager';
 import StudentsManager from './pages/StudentsManager';
@@ -28,12 +29,10 @@ function ProtectedRoute({ children }) {
   }
   
   if (!isAuthenticated) {
-    console.log('🔒 Not authenticated, redirecting to login');
     return <Navigate to="/login" replace />;
   }
   
-  console.log('🔓 Authenticated, showing protected content');
-  return children;
+  return <AdminLayout>{children}</AdminLayout>;
 }
 
 export default function AdminApp() {
