@@ -15,21 +15,32 @@ export function AdminProvider({ children }) {
     setLoading(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
+      
       if (session) {
-        const { data } = await supabase
+        console.log('🔍 Session found for user:', session.user.id);
+        
+        const { data, error } = await supabase
           .from('admin_users')
           .select('*')
           .eq('user_id', session.user.id)
           .maybeSingle();
+        
+        if (error) {
+          console.error('❌ Admin query error:', error);
+        }
+        
         if (data) {
           setAdminUser(data);
-          console.log('✅ Session restored:', data.email);
+          console.log('✅ Admin found:', data.role);
         } else {
-          console.warn('⚠️ No admin record found for user:', session.user.id);
+          console.warn('⚠️ No admin record for user_id:', session.user.id);
+          setAdminUser(null);
         }
+      } else {
+        console.log('🔍 No session found');
       }
     } catch (error) {
-      console.error('Session check error:', error);
+      console.error('❌ Session check error:', error);
     }
     setLoading(false);
   };
@@ -37,6 +48,7 @@ export function AdminProvider({ children }) {
   const login = async (email, password) => {
     try {
       console.log('🔑 Attempting login for:', email);
+      
       const { data, error } = await supabase.auth.signInWithPassword({
         email: email.trim(),
         password: password.trim(),
@@ -53,8 +65,8 @@ export function AdminProvider({ children }) {
       }
 
       console.log('✅ User logged in:', data.user.email);
+      console.log('🆔 User ID:', data.user.id);
 
-      // Check admin role
       const { data: adminData, error: adminError } = await supabase
         .from('admin_users')
         .select('*')
@@ -67,7 +79,7 @@ export function AdminProvider({ children }) {
       }
 
       if (!adminData) {
-        console.error('❌ No admin record found for user');
+        console.error('❌ No admin record found for user_id:', data.user.id);
         return { success: false, error: 'এই ব্যবহারকারীর অ্যাডমিন অ্যাক্সেস নেই' };
       }
 
