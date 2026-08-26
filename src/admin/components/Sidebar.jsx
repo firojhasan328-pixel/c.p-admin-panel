@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { useAdmin } from '../../context/AdminContext';
 
 const menuItems = [
   { path: '/', icon: '📊', label: 'ড্যাশবোর্ড' },
@@ -23,73 +24,267 @@ const menuItems = [
 
 export default function Sidebar() {
   const location = useLocation();
+  const { adminUser, logout } = useAdmin();
+  const [isMobileOpen, setIsMobileOpen] = useState(false);
 
   return (
-    <div style={styles.sidebar}>
-      <div style={styles.logo}>📚 অ্যাডমিন</div>
-      <nav style={styles.nav}>
-        {menuItems.map((item) => (
-          <Link
-            key={item.path}
-            to={item.path}
-            style={{
-              ...styles.link,
-              ...(location.pathname === item.path ? styles.active : {})
-            }}
-          >
-            <span style={styles.icon}>{item.icon}</span>
-            <span>{item.label}</span>
-          </Link>
-        ))}
-      </nav>
-    </div>
+    <>
+      {/* মোবাইল হ্যামবার্গার */}
+      <button onClick={() => setIsMobileOpen(!isMobileOpen)} style={styles.hamburger}>
+        ☰
+      </button>
+
+      {/* সাইডবার */}
+      <div style={{
+        ...styles.sidebar,
+        ...(isMobileOpen ? styles.sidebarOpen : {}),
+      }}>
+        {/* লোগো */}
+        <div style={styles.logo}>
+          <span style={styles.logoIcon}>📚</span>
+          <span style={styles.logoText}>চিলমারী</span>
+          <span style={styles.logoBadge}>ADMIN</span>
+        </div>
+
+        {/* ইউজার প্রোফাইল */}
+        <div style={styles.profile}>
+          <div style={styles.profileAvatar}>
+            {adminUser?.name?.charAt(0) || 'A'}
+          </div>
+          <div style={styles.profileInfo}>
+            <div style={styles.profileName}>{adminUser?.name || 'অ্যাডমিন'}</div>
+            <div style={styles.profileRole}>
+              <span style={styles.onlineDot}></span>
+              {adminUser?.role === 'super_admin' ? '⭐ সুপার অ্যাডমিন' : '🔹 অ্যাডমিন'}
+            </div>
+          </div>
+        </div>
+
+        {/* মেনু */}
+        <nav style={styles.nav}>
+          {menuItems.map((item) => (
+            <Link
+              key={item.path}
+              to={item.path}
+              style={{
+                ...styles.link,
+                ...(location.pathname === item.path ? styles.active : {}),
+              }}
+              onClick={() => setIsMobileOpen(false)}
+            >
+              <span style={styles.linkIcon}>{item.icon}</span>
+              <span style={styles.linkLabel}>{item.label}</span>
+              {location.pathname === item.path && (
+                <span style={styles.activeIndicator}></span>
+              )}
+            </Link>
+          ))}
+        </nav>
+
+        {/* লগআউট */}
+        <div style={styles.logoutSection}>
+          <button onClick={logout} style={styles.logoutBtn}>
+            <span>🚪</span> লগআউট
+          </button>
+        </div>
+
+        {/* ভার্সন */}
+        <div style={styles.version}>v1.0.0</div>
+      </div>
+
+      {/* ওভারলে (মোবাইল) */}
+      {isMobileOpen && (
+        <div style={styles.overlay} onClick={() => setIsMobileOpen(false)}></div>
+      )}
+    </>
   );
 }
 
 const styles = {
-  sidebar: {
-    width: '220px',
+  hamburger: {
+    position: 'fixed',
+    top: '12px',
+    left: '12px',
+    zIndex: 1000,
     background: '#0f172a',
     color: 'white',
+    border: 'none',
+    fontSize: '24px',
+    padding: '8px 14px',
+    borderRadius: '8px',
+    cursor: 'pointer',
+    display: 'none',
+    '@media (max-width: 768px)': { display: 'block' },
+  },
+  sidebar: {
+    width: '260px',
+    background: 'linear-gradient(180deg, #0f172a 0%, #1e293b 100%)',
+    color: 'white',
     minHeight: '100vh',
-    padding: '16px 0',
+    padding: '20px 0',
     position: 'fixed',
     top: 0,
     left: 0,
     overflowY: 'auto',
-    zIndex: 100,
+    zIndex: 999,
+    transition: 'transform 0.3s ease',
+    boxShadow: '4px 0 20px rgba(0,0,0,0.3)',
+  },
+  sidebarOpen: {
+    transform: 'translateX(0)',
   },
   logo: {
-    fontSize: '20px',
-    fontWeight: '700',
+    display: 'flex',
+    alignItems: 'center',
     padding: '0 20px 20px 20px',
-    borderBottom: '1px solid #1e293b',
-    marginBottom: '12px',
+    borderBottom: '1px solid rgba(255,255,255,0.08)',
+    marginBottom: '20px',
+    gap: '10px',
+  },
+  logoIcon: { fontSize: '28px' },
+  logoText: {
+    fontSize: '18px',
+    fontWeight: '700',
     color: '#16a34a',
+    letterSpacing: '0.5px',
+  },
+  logoBadge: {
+    fontSize: '10px',
+    background: 'rgba(22, 163, 74, 0.2)',
+    color: '#16a34a',
+    padding: '2px 10px',
+    borderRadius: '12px',
+    fontWeight: '600',
+    marginLeft: 'auto',
+  },
+  profile: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+    padding: '0 20px 20px 20px',
+    borderBottom: '1px solid rgba(255,255,255,0.06)',
+    marginBottom: '12px',
+  },
+  profileAvatar: {
+    width: '42px',
+    height: '42px',
+    borderRadius: '50%',
+    background: 'linear-gradient(135deg, #16a34a, #15803d)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '18px',
+    fontWeight: '700',
+    color: 'white',
+    flexShrink: 0,
+  },
+  profileInfo: { flex: 1, minWidth: 0 },
+  profileName: {
+    fontSize: '14px',
+    fontWeight: '600',
+    color: 'white',
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+  },
+  profileRole: {
+    fontSize: '11px',
+    color: '#94a3b8',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+  },
+  onlineDot: {
+    width: '6px',
+    height: '6px',
+    borderRadius: '50%',
+    background: '#16a34a',
+    display: 'inline-block',
+    animation: 'pulse 2s infinite',
   },
   nav: {
     display: 'flex',
     flexDirection: 'column',
     gap: '2px',
+    padding: '0 10px',
+    flex: 1,
   },
   link: {
     display: 'flex',
     alignItems: 'center',
-    gap: '12px',
-    padding: '10px 20px',
+    gap: '14px',
+    padding: '10px 16px',
     color: '#94a3b8',
     textDecoration: 'none',
     fontSize: '14px',
-    transition: 'all 0.2s',
+    borderRadius: '10px',
+    transition: 'all 0.25s ease',
+    position: 'relative',
+    fontWeight: '500',
   },
+  linkIcon: { fontSize: '18px', width: '24px', textAlign: 'center' },
+  linkLabel: { flex: 1 },
   active: {
-    background: '#1e293b',
-    color: 'white',
-    borderRight: '3px solid #16a34a',
+    background: 'rgba(22, 163, 74, 0.15)',
+    color: '#16a34a',
   },
-  icon: {
-    fontSize: '18px',
-    width: '24px',
+  activeIndicator: {
+    width: '3px',
+    height: '24px',
+    background: '#16a34a',
+    borderRadius: '4px',
+    position: 'absolute',
+    right: '0',
+  },
+  logoutSection: {
+    padding: '16px 20px 12px 20px',
+    borderTop: '1px solid rgba(255,255,255,0.06)',
+    marginTop: 'auto',
+  },
+  logoutBtn: {
+    width: '100%',
+    background: 'rgba(220, 38, 38, 0.15)',
+    color: '#ef4444',
+    border: 'none',
+    padding: '10px',
+    borderRadius: '10px',
+    fontSize: '14px',
+    fontWeight: '600',
+    cursor: 'pointer',
+    transition: 'all 0.3s ease',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '10px',
+  },
+  version: {
     textAlign: 'center',
+    fontSize: '11px',
+    color: '#475569',
+    padding: '8px 0',
+    letterSpacing: '0.5px',
+  },
+  overlay: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    background: 'rgba(0,0,0,0.5)',
+    zIndex: 998,
   },
 };
+
+// CSS অ্যানিমেশন যোগ করতে HEAD এ inject করব
+const styleSheet = document.createElement('style');
+styleSheet.textContent = `
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+  @media (max-width: 768px) {
+    .sidebar-fixed { transform: translateX(-100%); }
+    .sidebar-open { transform: translateX(0); }
+  }
+`;
+document.head.appendChild(styleSheet);
