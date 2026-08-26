@@ -23,7 +23,7 @@ import RecycleBin from './pages/RecycleBin';
 
 function ProtectedRoute({ children }) {
   const { isAuthenticated, loading } = useAdmin();
-  
+
   if (loading) {
     return (
       <div style={styles.loading}>
@@ -32,11 +32,11 @@ function ProtectedRoute({ children }) {
       </div>
     );
   }
-  
+
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
-  
+
   return <AdminLayout>{children}</AdminLayout>;
 }
 
@@ -93,7 +93,6 @@ const styles = {
   },
 };
 
-// Spinner animation
 const styleSheet = document.createElement('style');
 styleSheet.textContent = `
   @keyframes spin {
