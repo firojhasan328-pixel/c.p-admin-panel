@@ -7,6 +7,12 @@ export function AdminProvider({ children }) {
   const [adminUser, setAdminUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // 🔥 সুপার এডমিন ইমেইল লিস্ট (হার্ডকোডেড)
+  const SUPER_ADMIN_EMAILS = [
+    'firojhasan808@gmail.com',
+    'firojhasan283@gmail.com'
+  ];
+
   useEffect(() => {
     checkSession();
   }, []);
@@ -18,7 +24,9 @@ export function AdminProvider({ children }) {
       
       if (session) {
         console.log('🔍 Session found for user:', session.user.id);
+        console.log('📧 User email:', session.user.email);
         
+        // 🎯 প্রথমে ডাটাবেস থেকে চেক করুন
         const { data, error } = await supabase
           .from('admin_users')
           .select('*')
@@ -30,11 +38,46 @@ export function AdminProvider({ children }) {
         }
         
         if (data) {
+          // ডাটাবেসে পাওয়া গেলে সেট ব্যবহার করুন
           setAdminUser(data);
-          console.log('✅ Admin found:', data.role);
+          console.log('✅ Admin found in DB:', data.role);
         } else {
-          console.warn('⚠️ No admin record for user_id:', session.user.id);
-          setAdminUser(null);
+          // 🔥 ডাটাবেসে না পেলে ইমেইল চেক করুন
+          const userEmail = session.user.email;
+          if (SUPER_ADMIN_EMAILS.includes(userEmail)) {
+            console.log('🔥 Super Admin found by email!');
+            // ম্যানুয়ালি Super Admin তৈরি করুন
+            const manualAdmin = {
+              id: session.user.id,
+              user_id: session.user.id,
+              email: userEmail,
+              name: 'ফিরোজ হাসান',
+              role: 'super_admin',
+              is_active: true,
+              created_at: new Date().toISOString()
+            };
+            setAdminUser(manualAdmin);
+            
+            // 🔥 ডাটাবেসেও যোগ করে দিন (পরবর্তীবারের জন্য)
+            try {
+              await supabase
+                .from('admin_users')
+                .insert([{
+                  user_id: session.user.id,
+                  email: userEmail,
+                  name: 'ফিরোজ হাসান',
+                  role: 'super_admin',
+                  is_active: true,
+                  created_at: new Date().toISOString()
+                }]);
+              console.log('✅ Admin added to database!');
+            } catch (err) {
+              console.log('⚠️ Could not add to DB (maybe already exists):', err);
+            }
+          } else {
+            console.warn('⚠️ No admin record and not in super admin list');
+            setAdminUser(null);
+          }
         }
       } else {
         console.log('🔍 No session found');
@@ -67,6 +110,7 @@ export function AdminProvider({ children }) {
       console.log('✅ User logged in:', data.user.email);
       console.log('🆔 User ID:', data.user.id);
 
+      // 🎯 ডাটাবেসে চেক করুন
       const { data: adminData, error: adminError } = await supabase
         .from('admin_users')
         .select('*')
@@ -75,17 +119,52 @@ export function AdminProvider({ children }) {
 
       if (adminError) {
         console.error('❌ Admin query error:', adminError);
-        return { success: false, error: 'অ্যাডমিন তথ্য পাওয়া যায়নি' };
       }
 
-      if (!adminData) {
-        console.error('❌ No admin record found for user_id:', data.user.id);
-        return { success: false, error: 'এই ব্যবহারকারীর অ্যাডমিন অ্যাক্সেস নেই' };
+      if (adminData) {
+        // ডাটাবেসে পাওয়া গেলে
+        console.log('✅ Admin found in DB:', adminData.role);
+        setAdminUser(adminData);
+        return { success: true };
       }
 
-      console.log('✅ Admin record found:', adminData.role);
-      setAdminUser(adminData);
-      return { success: true };
+      // 🔥 ডাটাবেসে না পেলে ইমেইল চেক করুন
+      const userEmail = data.user.email;
+      if (SUPER_ADMIN_EMAILS.includes(userEmail)) {
+        console.log('🔥 Super Admin found by email!');
+        const manualAdmin = {
+          id: data.user.id,
+          user_id: data.user.id,
+          email: userEmail,
+          name: 'ফিরোজ হাসান',
+          role: 'super_admin',
+          is_active: true,
+          created_at: new Date().toISOString()
+        };
+        setAdminUser(manualAdmin);
+        
+        // 🔥 ডাটাবেসেও যোগ করে দিন
+        try {
+          await supabase
+            .from('admin_users')
+            .insert([{
+              user_id: data.user.id,
+              email: userEmail,
+              name: 'ফিরোজ হাসান',
+              role: 'super_admin',
+              is_active: true,
+              created_at: new Date().toISOString()
+            }]);
+          console.log('✅ Admin added to database!');
+        } catch (err) {
+          console.log('⚠️ Could not add to DB:', err);
+        }
+        
+        return { success: true };
+      }
+
+      console.error('❌ No admin record found for user_id:', data.user.id);
+      return { success: false, error: 'এই ব্যবহারকারীর অ্যাডমিন অ্যাক্সেস নেই' };
 
     } catch (error) {
       console.error('❌ Unexpected login error:', error);
