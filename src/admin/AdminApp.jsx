@@ -25,7 +25,12 @@ function ProtectedRoute({ children }) {
   const { isAuthenticated, loading } = useAdmin();
   
   if (loading) {
-    return <div style={{textAlign: 'center', padding: '50px'}}>⏳ লোড হচ্ছে...</div>;
+    return (
+      <div style={styles.loading}>
+        <div style={styles.loadingSpinner}></div>
+        <p style={styles.loadingText}>⏳ লোড হচ্ছে...</p>
+      </div>
+    );
   }
   
   if (!isAuthenticated) {
@@ -63,3 +68,37 @@ export default function AdminApp() {
     </AdminProvider>
   );
 }
+
+const styles = {
+  loading: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: '100vh',
+    background: '#f1f5f9',
+  },
+  loadingSpinner: {
+    width: '48px',
+    height: '48px',
+    border: '4px solid #e2e8f0',
+    borderTop: '4px solid #16a34a',
+    borderRadius: '50%',
+    animation: 'spin 1s linear infinite',
+  },
+  loadingText: {
+    marginTop: '16px',
+    color: '#64748b',
+    fontSize: '16px',
+  },
+};
+
+// Spinner animation
+const styleSheet = document.createElement('style');
+styleSheet.textContent = `
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+`;
+document.head.appendChild(styleSheet);
