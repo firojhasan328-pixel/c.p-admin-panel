@@ -10,7 +10,6 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // যদি already authenticated হয় তাহলে Dashboard-এ redirect
   useEffect(() => {
     if (isAuthenticated) {
       navigate('/');
@@ -26,10 +25,13 @@ export default function Login() {
       const result = await login(email, password);
       
       if (result.success) {
-        // Login সফল হলে Dashboard-এ redirect
         navigate('/');
       } else {
-        setError(result.error || 'লগইন ব্যর্থ');
+        if (result.error === 'এই ব্যবহারকারীর অ্যাডমিন অ্যাক্সেস নেই') {
+          setError('⚠️ আপনার অ্যাকাউন্টে অ্যাডমিন অ্যাক্সেস নেই। সুপার অ্যাডমিনের সাথে যোগাযোগ করুন।');
+        } else {
+          setError(result.error || 'লগইন ব্যর্থ');
+        }
       }
     } catch (err) {
       setError('লগইন করতে সমস্যা হয়েছে');
