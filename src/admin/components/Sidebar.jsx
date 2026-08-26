@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAdmin } from '../../context/AdminContext';
 
@@ -22,23 +22,38 @@ const menuItems = [
   { path: '/recycle', icon: '🗑️', label: 'রিসাইকেল' },
 ];
 
-export default function Sidebar() {
+export default function Sidebar({ isOpen, toggleSidebar }) {
   const location = useLocation();
   const { adminUser, logout } = useAdmin();
-  const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const handleLinkClick = () => {
+    if (isMobile) {
+      toggleSidebar();
+    }
+  };
 
   return (
     <>
-      {/* মোবাইল হ্যামবার্গার */}
-      <button onClick={() => setIsMobileOpen(!isMobileOpen)} style={styles.hamburger}>
-        ☰
-      </button>
-
       {/* সাইডবার */}
-      <div style={{
-        ...styles.sidebar,
-        ...(isMobileOpen ? styles.sidebarOpen : {}),
-      }}>
+      <div
+        style={{
+          ...styles.sidebar,
+          transform: isMobile
+            ? isOpen
+              ? 'translateX(0)'
+              : 'translateX(-100%)'
+            : 'translateX(0)',
+        }}
+      >
         {/* লোগো */}
         <div style={styles.logo}>
           <span style={styles.logoIcon}>📚</span>
@@ -70,7 +85,7 @@ export default function Sidebar() {
                 ...styles.link,
                 ...(location.pathname === item.path ? styles.active : {}),
               }}
-              onClick={() => setIsMobileOpen(false)}
+              onClick={handleLinkClick}
             >
               <span style={styles.linkIcon}>{item.icon}</span>
               <span style={styles.linkLabel}>{item.label}</span>
@@ -92,30 +107,15 @@ export default function Sidebar() {
         <div style={styles.version}>v1.0.0</div>
       </div>
 
-      {/* ওভারলে (মোবাইল) */}
-      {isMobileOpen && (
-        <div style={styles.overlay} onClick={() => setIsMobileOpen(false)}></div>
+      {/* ওভারলে (শুধু মোবাইলে) */}
+      {isMobile && isOpen && (
+        <div style={styles.overlay} onClick={toggleSidebar}></div>
       )}
     </>
   );
 }
 
 const styles = {
-  hamburger: {
-    position: 'fixed',
-    top: '12px',
-    left: '12px',
-    zIndex: 1000,
-    background: '#0f172a',
-    color: 'white',
-    border: 'none',
-    fontSize: '24px',
-    padding: '8px 14px',
-    borderRadius: '8px',
-    cursor: 'pointer',
-    display: 'none',
-    '@media (max-width: 768px)': { display: 'block' },
-  },
   sidebar: {
     width: '260px',
     background: 'linear-gradient(180deg, #0f172a 0%, #1e293b 100%)',
@@ -127,11 +127,8 @@ const styles = {
     left: 0,
     overflowY: 'auto',
     zIndex: 999,
-    transition: 'transform 0.3s ease',
+    transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
     boxShadow: '4px 0 20px rgba(0,0,0,0.3)',
-  },
-  sidebarOpen: {
-    transform: 'translateX(0)',
   },
   logo: {
     display: 'flex',
@@ -272,19 +269,20 @@ const styles = {
     bottom: 0,
     background: 'rgba(0,0,0,0.5)',
     zIndex: 998,
+    animation: 'fadeIn 0.3s ease',
   },
 };
 
-// CSS অ্যানিমেশন যোগ করতে HEAD এ inject করব
+// CSS অ্যানিমেশন
 const styleSheet = document.createElement('style');
 styleSheet.textContent = `
   @keyframes pulse {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.3; }
   }
-  @media (max-width: 768px) {
-    .sidebar-fixed { transform: translateX(-100%); }
-    .sidebar-open { transform: translateX(0); }
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
   }
 `;
 document.head.appendChild(styleSheet);
