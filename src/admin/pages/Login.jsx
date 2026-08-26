@@ -23,19 +23,13 @@ export default function Login() {
     
     try {
       const result = await login(email, password);
-      
       if (result.success) {
         navigate('/');
       } else {
-        if (result.error === 'এই ব্যবহারকারীর অ্যাডমিন অ্যাক্সেস নেই') {
-          setError('⚠️ আপনার অ্যাকাউন্টে অ্যাডমিন অ্যাক্সেস নেই। সুপার অ্যাডমিনের সাথে যোগাযোগ করুন।');
-        } else {
-          setError(result.error || 'লগইন ব্যর্থ');
-        }
+        setError(result.error || 'লগইন ব্যর্থ');
       }
     } catch (err) {
       setError('লগইন করতে সমস্যা হয়েছে');
-      console.error('Login error:', err);
     } finally {
       setLoading(false);
     }
@@ -43,113 +37,184 @@ export default function Login() {
 
   return (
     <div style={styles.container}>
+      <div style={styles.bgDecoration}></div>
       <div style={styles.card}>
-        <div style={styles.logo}>🔐</div>
-        <h1 style={styles.title}>অ্যাডমিন লগইন</h1>
-        <p style={styles.subtitle}>চিলমারী প্রি ক্যাডেট মাদ্রাসা</p>
+        <div style={styles.cardHeader}>
+          <div style={styles.logo}>📚</div>
+          <h1 style={styles.title}>অ্যাডমিন লগইন</h1>
+          <p style={styles.subtitle}>চিলমারী প্রি ক্যাডেট মাদ্রাসা</p>
+        </div>
+
         {error && <div style={styles.errorBox}>{error}</div>}
+
         <form onSubmit={handleSubmit} style={styles.form}>
           <div style={styles.field}>
             <label style={styles.label}>📧 ইমেইল</label>
-            <input 
-              type="email" 
-              value={email} 
-              onChange={(e) => setEmail(e.target.value)} 
-              placeholder="admin@email.com" 
-              required 
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="admin@email.com"
+              required
               style={styles.input}
               disabled={loading}
             />
           </div>
+
           <div style={styles.field}>
             <label style={styles.label}>🔑 পাসওয়ার্ড</label>
-            <input 
-              type="password" 
-              value={password} 
-              onChange={(e) => setPassword(e.target.value)} 
-              placeholder="••••••••" 
-              required 
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+              required
               style={styles.input}
               disabled={loading}
             />
           </div>
-          <button 
-            type="submit" 
-            disabled={loading} 
+
+          <button
+            type="submit"
+            disabled={loading}
             style={{
               ...styles.button,
               opacity: loading ? 0.7 : 1,
-              cursor: loading ? 'not-allowed' : 'pointer'
+              cursor: loading ? 'not-allowed' : 'pointer',
             }}
           >
-            {loading ? '⏳ লগইন হচ্ছে...' : '🚀 লগইন'}
+            {loading ? '⏳ লগইন হচ্ছে...' : '🚀 লগইন করুন'}
           </button>
         </form>
+
+        <div style={styles.footer}>
+          <span style={styles.footerText}>🔒 নিরাপদ লগইন</span>
+        </div>
       </div>
     </div>
   );
 }
 
 const styles = {
-  container: { 
-    minHeight: '100vh', 
-    display: 'flex', 
-    alignItems: 'center', 
-    justifyContent: 'center', 
-    background: 'linear-gradient(135deg, #064e3b, #14532d)', 
-    padding: '20px' 
+  container: {
+    minHeight: '100vh',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%)',
+    padding: '20px',
+    position: 'relative',
+    overflow: 'hidden',
   },
-  card: { 
-    background: 'white', 
-    padding: '40px 32px', 
-    borderRadius: '28px', 
-    maxWidth: '400px', 
-    width: '100%', 
-    boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)' 
+  bgDecoration: {
+    position: 'absolute',
+    width: '400px',
+    height: '400px',
+    borderRadius: '50%',
+    background: 'radial-gradient(circle, rgba(22,163,74,0.1) 0%, transparent 70%)',
+    top: '-100px',
+    right: '-100px',
+    animation: 'float 8s ease-in-out infinite',
   },
-  logo: { fontSize: '48px', textAlign: 'center', marginBottom: '8px' },
-  title: { 
-    fontSize: '24px', 
-    fontWeight: '800', 
-    color: '#0f172a', 
-    textAlign: 'center', 
-    margin: '0 0 4px 0' 
+  card: {
+    background: 'rgba(255,255,255,0.95)',
+    backdropFilter: 'blur(20px)',
+    padding: '44px 36px',
+    borderRadius: '28px',
+    maxWidth: '420px',
+    width: '100%',
+    boxShadow: '0 30px 60px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.05)',
+    position: 'relative',
+    zIndex: 1,
+    animation: 'slideUp 0.6s ease',
   },
-  subtitle: { 
-    fontSize: '14px', 
-    color: '#64748b', 
-    textAlign: 'center', 
-    margin: '0 0 24px 0' 
+  cardHeader: { textAlign: 'center', marginBottom: '28px' },
+  logo: {
+    fontSize: '48px',
+    marginBottom: '8px',
+    display: 'inline-block',
+    animation: 'bounce 2s infinite',
   },
-  errorBox: { 
-    background: '#fee2e2', 
-    color: '#991b1b', 
-    padding: '10px 14px', 
-    borderRadius: '10px', 
-    fontSize: '13px', 
-    marginBottom: '16px', 
-    borderLeft: '4px solid #dc2626' 
+  title: {
+    fontSize: '24px',
+    fontWeight: '800',
+    color: '#0f172a',
+    margin: '0 0 4px 0',
+    letterSpacing: '-0.5px',
   },
-  form: { display: 'flex', flexDirection: 'column', gap: '14px' },
-  field: { display: 'flex', flexDirection: 'column', gap: '4px' },
+  subtitle: {
+    fontSize: '14px',
+    color: '#64748b',
+    margin: 0,
+    fontWeight: '500',
+  },
+  errorBox: {
+    background: '#fee2e2',
+    color: '#991b1b',
+    padding: '12px 16px',
+    borderRadius: '12px',
+    fontSize: '13px',
+    marginBottom: '20px',
+    borderLeft: '4px solid #dc2626',
+    animation: 'shake 0.4s ease',
+  },
+  form: { display: 'flex', flexDirection: 'column', gap: '16px' },
+  field: { display: 'flex', flexDirection: 'column', gap: '6px' },
   label: { fontSize: '13px', fontWeight: '600', color: '#334155' },
-  input: { 
-    padding: '12px 14px', 
-    borderRadius: '12px', 
-    border: '1.5px solid #e2e8f0', 
-    fontSize: '14px', 
-    outline: 'none', 
-    backgroundColor: '#f8fafc' 
+  input: {
+    padding: '12px 16px',
+    borderRadius: '12px',
+    border: '2px solid #e2e8f0',
+    fontSize: '14px',
+    outline: 'none',
+    backgroundColor: '#f8fafc',
+    transition: 'all 0.3s ease',
   },
-  button: { 
-    background: 'linear-gradient(135deg, #16a34a, #15803d)', 
-    color: 'white', 
-    border: 'none', 
-    padding: '14px', 
-    borderRadius: '12px', 
-    fontSize: '16px', 
-    fontWeight: '700', 
-    boxShadow: '0 6px 20px rgba(22,163,74,0.3)', 
-    marginTop: '4px' 
+  button: {
+    background: 'linear-gradient(135deg, #16a34a, #15803d)',
+    color: 'white',
+    border: 'none',
+    padding: '14px',
+    borderRadius: '12px',
+    fontSize: '16px',
+    fontWeight: '700',
+    cursor: 'pointer',
+    boxShadow: '0 6px 24px rgba(22,163,74,0.35)',
+    transition: 'all 0.3s ease',
+    marginTop: '4px',
+  },
+  footer: {
+    textAlign: 'center',
+    marginTop: '20px',
+    paddingTop: '16px',
+    borderTop: '1px solid #f1f5f9',
+  },
+  footerText: {
+    fontSize: '12px',
+    color: '#94a3b8',
+    fontWeight: '500',
   },
 };
+
+// অ্যানিমেশন inject
+const styleSheet = document.createElement('style');
+styleSheet.textContent = `
+  @keyframes float {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    50% { transform: translate(-20px, 20px) scale(1.1); }
+  }
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateY(30px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes bounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-8px); }
+  }
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-8px); }
+    75% { transform: translateX(8px); }
+  }
+`;
+document.head.appendChild(styleSheet);
