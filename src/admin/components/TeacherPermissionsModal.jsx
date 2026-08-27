@@ -34,6 +34,7 @@ export default function TeacherPermissionsModal({
   const loadTeacherPermissions = async () => {
     setLoading(true);
     try {
+      // ১. teacher_permissions লোড
       const { data, error } = await supabase
         .from('teacher_permissions')
         .select('*')
@@ -46,7 +47,21 @@ export default function TeacherPermissionsModal({
         permMap[item.permission_key] = item.is_allowed;
       });
 
-      if (teacher?.role === 'super_admin') {
+      // ২. admin_users থেকে রোল লোড
+      const { data: adminData } = await supabase
+        .from('admin_users')
+        .select('role')
+        .eq('email', teacher?.email)
+        .maybeSingle();
+
+      if (adminData) {
+        setSelectedRole(adminData.role);
+      } else {
+        setSelectedRole('teacher');
+      }
+
+      // ৩. পারমিশন সেট
+      if (selectedRole === 'super_admin') {
         const allTrue = {};
         ALL_PERMISSIONS.forEach(p => { allTrue[p.key] = true; });
         setSelectedPermissions(allTrue);
@@ -101,26 +116,54 @@ export default function TeacherPermissionsModal({
     setError('');
   };
 
+  // =============================================
+  // ✅ ✅ ✅ প্রধান ফাংশন: পারমিশন সেভ
+  // =============================================
   const handleSave = async () => {
     setSaving(true);
     setError('');
 
     try {
-      const { error: roleError } = await supabase
+      // ১. admin_users এ ইউজার যোগ/আপডেট করুন
+      const { error: adminError } = await supabase
         .from('admin_users')
-        .update({ role: selectedRole })
-        .eq('email', teacher?.email);
+        .upsert({
+          user_id: teacher?.id,
+          email: teacher?.email,
+          name: teacher?.name,
+          role: selectedRole,
+          is_active: true,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'user_id' });
+
+      if (adminError) throw adminError;
+      console.log('✅ Admin user saved:', teacher?.email);
+
+      // ২. user_roles এ রোল যোগ করুন
+      const { error: roleError } = await supabase
+        .from('user_roles')
+        .upsert({
+          user_id: teacher?.id,
+          role_name: selectedRole,
+          created_at: new Date().toISOString()
+        }, { onConflict: 'user_id,role_name' });
 
       if (roleError) throw roleError;
+      console.log('✅ Role saved:', selectedRole);
 
+      // ৩. teacher_permissions এ পারমিশন যোগ করুন
       for (const [key, value] of Object.entries(selectedPermissions)) {
         const result = await updatePermissionByEmail(teacher?.email, key, value);
         if (!result.success) throw new Error(result.error);
       }
+      console.log('✅ Permissions saved');
 
+      // ৪. সাফল্য
       onSuccess?.();
       onClose();
+
     } catch (error) {
+      console.error('❌ Save error:', error);
       setError(error.message || 'সংরক্ষণ করতে সমস্যা হয়েছে');
     }
     setSaving(false);
