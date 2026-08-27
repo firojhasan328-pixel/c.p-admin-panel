@@ -22,7 +22,6 @@ export default function TeachersManager() {
   const [selectedTeacher, setSelectedTeacher] = useState(null);
   const [showPermissionsModal, setShowPermissionsModal] = useState(false);
 
-  // চেক করুন ইউজারের শিক্ষক ব্যবস্থাপনা পারমিশন আছে কিনা
   const canManageTeachers = hasPermission('manage_teachers');
   const canManagePermissions = hasPermission('manage_permissions');
 
@@ -90,7 +89,6 @@ export default function TeachersManager() {
     setShowPermissionsModal(true);
   };
 
-  // পারমিশন না থাকলে মেসেজ দেখান
   if (!canManageTeachers) {
     return (
       <div style={styles.noAccess}>
@@ -157,7 +155,6 @@ export default function TeachersManager() {
         </div>
       )}
 
-      {/* পারমিশন মোডাল */}
       <TeacherPermissionsModal
         teacher={selectedTeacher}
         isOpen={showPermissionsModal}
