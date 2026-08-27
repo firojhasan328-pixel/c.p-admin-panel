@@ -21,6 +21,7 @@ export default function TeachersManager() {
   });
   const [selectedTeacher, setSelectedTeacher] = useState(null);
   const [showPermissionsModal, setShowPermissionsModal] = useState(false);
+  const [teacherRoles, setTeacherRoles] = useState({});
 
   const canManageTeachers = hasPermission('manage_teachers');
   const canManagePermissions = hasPermission('manage_permissions');
@@ -28,8 +29,31 @@ export default function TeachersManager() {
   useEffect(() => {
     if (canManageTeachers) {
       fetchTeachers();
+      fetchAllRoles();
     }
   }, [canManageTeachers]);
+
+  // =============================================
+  // ✅ সব শিক্ষকের রোল লোড করুন
+  // =============================================
+  const fetchAllRoles = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('admin_users')
+        .select('email, role');
+
+      if (data) {
+        const roleMap = {};
+        data.forEach(item => {
+          roleMap[item.email] = item.role;
+        });
+        setTeacherRoles(roleMap);
+        console.log('✅ Roles loaded:', roleMap);
+      }
+    } catch (error) {
+      console.error('❌ Fetch roles error:', error);
+    }
+  };
 
   const fetchTeachers = async () => {
     setLoading(true);
@@ -89,6 +113,43 @@ export default function TeachersManager() {
     setShowPermissionsModal(true);
   };
 
+  // =============================================
+  // ✅ রোল অনুযায়ী ব্যাজ স্টাইল
+  // =============================================
+  const getRoleBadge = (email) => {
+    const role = teacherRoles[email];
+    if (!role) return null;
+    
+    const badges = {
+      super_admin: { 
+        label: '⭐ সুপার অ্যাডমিন', 
+        bg: '#dcfce7', 
+        color: '#16a34a',
+        border: '2px solid #16a34a'
+      },
+      admin: { 
+        label: '🔹 সাব অ্যাডমিন', 
+        bg: '#dbeafe', 
+        color: '#2563eb',
+        border: '2px solid #2563eb'
+      },
+      teacher: { 
+        label: '👨‍🏫 শিক্ষক', 
+        bg: '#fef3c7', 
+        color: '#f59e0b',
+        border: '2px solid #f59e0b'
+      },
+      viewer: { 
+        label: '👁️ দর্শক', 
+        bg: '#f1f5f9', 
+        color: '#64748b',
+        border: '2px solid #64748b'
+      }
+    };
+    
+    return badges[role] || null;
+  };
+
   if (!canManageTeachers) {
     return (
       <div style={styles.noAccess}>
@@ -130,28 +191,41 @@ export default function TeachersManager() {
         <p>⏳ লোড হচ্ছে...</p>
       ) : (
         <div style={styles.list}>
-          {teachers.map((t) => (
-            <div key={t.id} style={styles.item}>
-              <div style={styles.itemLeft}>
-                <strong>{t.name}</strong>
-                <span style={styles.badge}>{t.designation || 'শিক্ষক'}</span>
-                <span style={styles.badge2}>{t.subject}</span>
+          {teachers.map((t) => {
+            const roleBadge = getRoleBadge(t.email);
+            return (
+              <div key={t.id} style={styles.item}>
+                <div style={styles.itemLeft}>
+                  <strong style={styles.teacherName}>{t.name}</strong>
+                  {roleBadge && (
+                    <span style={{
+                      ...styles.roleBadge,
+                      background: roleBadge.bg,
+                      color: roleBadge.color,
+                      border: roleBadge.border,
+                    }}>
+                      {roleBadge.label}
+                    </span>
+                  )}
+                  <span style={styles.badge}>{t.designation || 'শিক্ষক'}</span>
+                  <span style={styles.badge2}>{t.subject}</span>
+                </div>
+                <div style={styles.actions}>
+                  <button onClick={() => handleEdit(t)} style={styles.editBtn} title="এডিট">✏️</button>
+                  {canManagePermissions && (
+                    <button 
+                      onClick={() => handlePermissionsClick(t)} 
+                      style={styles.permissionBtn} 
+                      title="পারমিশন সেটিংস"
+                    >
+                      ⚙️
+                    </button>
+                  )}
+                  <button onClick={() => handleDelete(t.id)} style={styles.deleteBtn} title="ডিলিট">🗑️</button>
+                </div>
               </div>
-              <div style={styles.actions}>
-                <button onClick={() => handleEdit(t)} style={styles.editBtn} title="এডিট">✏️</button>
-                {canManagePermissions && (
-                  <button 
-                    onClick={() => handlePermissionsClick(t)} 
-                    style={styles.permissionBtn} 
-                    title="পারমিশন সেটিংস"
-                  >
-                    ⚙️
-                  </button>
-                )}
-                <button onClick={() => handleDelete(t.id)} style={styles.deleteBtn} title="ডিলিট">🗑️</button>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -164,6 +238,7 @@ export default function TeachersManager() {
         }}
         onSuccess={() => {
           fetchTeachers();
+          fetchAllRoles();
         }}
       />
     </div>
@@ -171,7 +246,7 @@ export default function TeachersManager() {
 }
 
 const styles = {
-  container: { maxWidth: '800px', margin: '0 auto' },
+  container: { maxWidth: '900px', margin: '0 auto' },
   noAccess: {
     textAlign: 'center',
     padding: '60px 20px',
@@ -191,8 +266,41 @@ const styles = {
   saveBtn: { background: '#16a34a', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '10px', fontWeight: '600', cursor: 'pointer' },
   cancelBtn: { background: '#64748b', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '10px', fontWeight: '600', cursor: 'pointer' },
   list: { display: 'flex', flexDirection: 'column', gap: '8px' },
-  item: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', background: 'white', borderRadius: '10px', border: '1px solid #e2e8f0', flexWrap: 'wrap', gap: '8px' },
-  itemLeft: { display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' },
+  item: { 
+    display: 'flex', 
+    justifyContent: 'space-between', 
+    alignItems: 'center', 
+    padding: '12px 16px', 
+    background: 'white', 
+    borderRadius: '10px', 
+    border: '1px solid #e2e8f0', 
+    flexWrap: 'wrap', 
+    gap: '8px',
+    transition: 'all 0.2s ease',
+    '&:hover': {
+      boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+    }
+  },
+  itemLeft: { 
+    display: 'flex', 
+    alignItems: 'center', 
+    gap: '10px', 
+    flexWrap: 'wrap',
+    flex: 1,
+  },
+  teacherName: { 
+    fontSize: '15px', 
+    fontWeight: '600', 
+    color: '#0f172a',
+  },
+  roleBadge: {
+    padding: '2px 12px',
+    borderRadius: '20px',
+    fontSize: '11px',
+    fontWeight: '700',
+    letterSpacing: '0.3px',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+  },
   badge: { background: '#dbeafe', color: '#2563eb', padding: '2px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: '600' },
   badge2: { background: '#dcfce7', color: '#16a34a', padding: '2px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: '600' },
   actions: { display: 'flex', gap: '6px' },
