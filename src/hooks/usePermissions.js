@@ -27,8 +27,29 @@ export function usePermissions() {
   const [permissions, setPermissions] = useState({});
   const [loading, setLoading] = useState(true);
 
+  // =============================================
+  // ✅ ইউজারের রোল ও পারমিশন লোড
+  // =============================================
   const loadPermissionsByEmail = async (email) => {
     try {
+      // ১. admin_users থেকে রোল লোড
+      const { data: adminData } = await supabase
+        .from('admin_users')
+        .select('role')
+        .eq('email', email)
+        .maybeSingle();
+
+      const userRole = adminData?.role || 'teacher';
+
+      // ২. যদি সুপার অ্যাডমিন হয়, সব পারমিশন true
+      if (userRole === 'super_admin') {
+        const allTrue = {};
+        ALL_PERMISSIONS.forEach(p => { allTrue[p.key] = true; });
+        setPermissions(allTrue);
+        return allTrue;
+      }
+
+      // ৩. teacher_permissions লোড
       const { data, error } = await supabase
         .from('teacher_permissions')
         .select('*')
@@ -40,24 +61,55 @@ export function usePermissions() {
       data.forEach(item => {
         permMap[item.permission_key] = item.is_allowed;
       });
+
+      // ৪. অ্যাডমিন হলে কিছু ডিফল্ট পারমিশন true
+      if (userRole === 'admin') {
+        const adminDefaults = ['view_dashboard', 'edit_homepage', 'manage_teachers', 'manage_students', 'manage_notices', 'manage_gallery'];
+        adminDefaults.forEach(key => {
+          permMap[key] = true;
+        });
+      }
+
       setPermissions(permMap);
       return permMap;
+
     } catch (error) {
       console.error('Load permissions error:', error);
       return {};
     }
   };
 
+  // =============================================
+  // ✅ পারমিশন আছে কিনা চেক
+  // =============================================
   const hasPermission = (permissionKey) => {
+    // সুপার অ্যাডমিন সব পারমিশন পায়
     if (adminUser?.role === 'super_admin') return true;
+    
+    // অ্যাডমিন কিছু ডিফল্ট পারমিশন পায়
+    if (adminUser?.role === 'admin') {
+      const adminDefaults = ['view_dashboard', 'edit_homepage', 'manage_teachers', 'manage_students', 'manage_notices', 'manage_gallery'];
+      if (adminDefaults.includes(permissionKey)) return true;
+    }
+    
     return permissions[permissionKey] === true;
   };
 
+  // =============================================
+  // ✅ পারমিশন দেওয়ার অনুমতি আছে কিনা
+  // =============================================
   const canGrantPermission = (permissionKey) => {
     if (adminUser?.role === 'super_admin') return true;
+    if (adminUser?.role === 'admin') {
+      // অ্যাডমিনরা পারমিশন দিতে পারে না (শুধু সুপার অ্যাডমিন)
+      return false;
+    }
     return permissions[permissionKey] === true;
   };
 
+  // =============================================
+  // ✅ পারমিশন আপডেট
+  // =============================================
   const updatePermissionByEmail = async (email, permissionKey, isAllowed) => {
     try {
       if (!canGrantPermission(permissionKey) && adminUser?.role !== 'super_admin') {
@@ -81,7 +133,7 @@ export function usePermissions() {
           .from('teacher_permissions')
           .update({ 
             is_allowed: isAllowed, 
-            granted_by: adminUser?.id,
+            granted_by: adminUser?.user_id || adminUser?.id,
             updated_at: new Date().toISOString()
           })
           .eq('id', existing.id);
@@ -92,33 +144,40 @@ export function usePermissions() {
             teacher_email: email,
             permission_key: permissionKey,
             is_allowed: isAllowed,
-            granted_by: adminUser?.id,
+            granted_by: adminUser?.user_id || adminUser?.id,
           }]);
       }
 
       if (result.error) throw result.error;
 
+      // লগ করুন
       await supabase
         .from('permission_logs')
         .insert([{
           action: isAllowed ? 'granted' : 'revoked',
           teacher_email: email,
           permission_key: permissionKey,
-          changed_by: adminUser?.id,
+          changed_by: adminUser?.user_id || adminUser?.id,
           old_value: existing?.is_allowed || false,
           new_value: isAllowed,
         }]);
 
       return { success: true };
+
     } catch (error) {
       console.error('Update permission error:', error);
       return { success: false, error: error.message };
     }
   };
 
+  // =============================================
+  // ✅ loadPermissions
+  // =============================================
   useEffect(() => {
     if (adminUser?.email) {
       loadPermissionsByEmail(adminUser.email).finally(() => setLoading(false));
+    } else {
+      setLoading(false);
     }
   }, [adminUser?.email]);
 
