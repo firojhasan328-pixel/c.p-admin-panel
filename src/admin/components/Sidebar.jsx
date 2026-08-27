@@ -1,30 +1,66 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAdmin } from '../../context/AdminContext';
+import { usePermissions } from '../../hooks/usePermissions';
 
-const menuItems = [
-  { path: '/', icon: '📊', label: 'ড্যাশবোর্ড' },
-  { path: '/homepage', icon: '🏠', label: 'হোমপেজ' },
-  { path: '/teachers', icon: '👨‍🏫', label: 'শিক্ষক' },
-  { path: '/students', icon: '🎓', label: 'ছাত্র' },
-  { path: '/notices', icon: '📢', label: 'নোটিশ' },
-  { path: '/gallery', icon: '🖼️', label: 'গ্যালারি' },
-  { path: '/contact', icon: '📞', label: 'যোগাযোগ' },
-  { path: '/footer', icon: '📋', label: 'ফুটার' },
-  { path: '/theme', icon: '🎨', label: 'থিম' },
-  { path: '/settings', icon: '⚙️', label: 'সেটিংস' },
-  { path: '/seo', icon: '🔍', label: 'এসইও' },
-  { path: '/media', icon: '📁', label: 'মিডিয়া' },
-  { path: '/users', icon: '👥', label: 'ব্যবহারকারী' },
-  { path: '/permissions', icon: '🔐', label: 'পারমিশন' },
-  { path: '/backup', icon: '💾', label: 'ব্যাকআপ' },
-  { path: '/logs', icon: '📋', label: 'অ্যাক্টিভিটি' },
-  { path: '/recycle', icon: '🗑️', label: 'রিসাইকেল' },
-];
+// =============================================
+// ✅ রোল অনুযায়ী মেনু দেখানো
+// =============================================
+const getMenuItems = (role, hasPermission) => {
+  // সবাই দেখতে পারে এমন মেনু
+  const baseMenus = [
+    { path: '/', icon: '📊', label: 'ড্যাশবোর্ড', permission: 'view_dashboard' },
+  ];
+
+  // শুধু সুপার অ্যাডমিন ও অ্যাডমিন দেখতে পারে
+  const adminMenus = [
+    { path: '/homepage', icon: '🏠', label: 'হোমপেজ', permission: 'edit_homepage' },
+    { path: '/teachers', icon: '👨‍🏫', label: 'শিক্ষক', permission: 'manage_teachers' },
+    { path: '/students', icon: '🎓', label: 'ছাত্র', permission: 'manage_students' },
+    { path: '/notices', icon: '📢', label: 'নোটিশ', permission: 'manage_notices' },
+    { path: '/gallery', icon: '🖼️', label: 'গ্যালারি', permission: 'manage_gallery' },
+    { path: '/contact', icon: '📞', label: 'যোগাযোগ', permission: 'manage_contact' },
+    { path: '/footer', icon: '📋', label: 'ফুটার', permission: 'manage_footer' },
+    { path: '/theme', icon: '🎨', label: 'থিম', permission: 'manage_theme' },
+    { path: '/settings', icon: '⚙️', label: 'সেটিংস', permission: 'manage_settings' },
+    { path: '/seo', icon: '🔍', label: 'এসইও', permission: 'manage_seo' },
+    { path: '/media', icon: '📁', label: 'মিডিয়া', permission: 'manage_media' },
+  ];
+
+  // শুধু সুপার অ্যাডমিন দেখতে পারে
+  const superAdminMenus = [
+    { path: '/users', icon: '👥', label: 'ব্যবহারকারী', permission: 'manage_users' },
+    { path: '/permissions', icon: '🔐', label: 'পারমিশন', permission: 'manage_permissions' },
+    { path: '/backup', icon: '💾', label: 'ব্যাকআপ', permission: 'manage_backup' },
+    { path: '/logs', icon: '📋', label: 'অ্যাক্টিভিটি', permission: 'view_logs' },
+    { path: '/recycle', icon: '🗑️', label: 'রিসাইকেল', permission: 'manage_recycle' },
+  ];
+
+  let menus = [...baseMenus];
+
+  // অ্যাডমিন বা সুপার অ্যাডমিন
+  if (role === 'admin' || role === 'super_admin') {
+    adminMenus.forEach(menu => {
+      if (hasPermission(menu.permission)) {
+        menus.push(menu);
+      }
+    });
+  }
+
+  // শুধু সুপার অ্যাডমিন
+  if (role === 'super_admin') {
+    superAdminMenus.forEach(menu => {
+      menus.push(menu);
+    });
+  }
+
+  return menus;
+};
 
 export default function Sidebar({ isOpen, toggleSidebar }) {
   const location = useLocation();
   const { adminUser, logout } = useAdmin();
+  const { hasPermission } = usePermissions();
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
 
   useEffect(() => {
@@ -35,15 +71,27 @@ export default function Sidebar({ isOpen, toggleSidebar }) {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  const menuItems = getMenuItems(adminUser?.role, hasPermission);
+
   const handleLinkClick = () => {
     if (isMobile) {
       toggleSidebar();
     }
   };
 
+  // রোল অনুযায়ী ব্যাজ
+  const getRoleBadge = () => {
+    const role = adminUser?.role;
+    if (role === 'super_admin') return { label: '⭐ সুপার অ্যাডমিন', color: '#16a34a' };
+    if (role === 'admin') return { label: '🔹 সাব অ্যাডমিন', color: '#2563eb' };
+    if (role === 'teacher') return { label: '👨‍🏫 শিক্ষক', color: '#f59e0b' };
+    return { label: '👁️ দর্শক', color: '#64748b' };
+  };
+
+  const roleBadge = getRoleBadge();
+
   return (
     <>
-      {/* সাইডবার */}
       <div
         style={{
           ...styles.sidebar,
@@ -68,9 +116,12 @@ export default function Sidebar({ isOpen, toggleSidebar }) {
           </div>
           <div style={styles.profileInfo}>
             <div style={styles.profileName}>{adminUser?.name || 'অ্যাডমিন'}</div>
-            <div style={styles.profileRole}>
+            <div style={{
+              ...styles.profileRole,
+              color: roleBadge.color,
+            }}>
               <span style={styles.onlineDot}></span>
-              {adminUser?.role === 'super_admin' ? '⭐ সুপার অ্যাডমিন' : '🔹 অ্যাডমিন'}
+              {roleBadge.label}
             </div>
           </div>
         </div>
@@ -107,7 +158,7 @@ export default function Sidebar({ isOpen, toggleSidebar }) {
         <div style={styles.version}>v1.0.0</div>
       </div>
 
-      {/* ওভারলে (শুধু মোবাইলে) */}
+      {/* ওভারলে */}
       {isMobile && isOpen && (
         <div style={styles.overlay} onClick={toggleSidebar}></div>
       )}
@@ -186,10 +237,10 @@ const styles = {
   },
   profileRole: {
     fontSize: '11px',
-    color: '#94a3b8',
     display: 'flex',
     alignItems: 'center',
     gap: '6px',
+    fontWeight: '600',
   },
   onlineDot: {
     width: '6px',
@@ -273,7 +324,6 @@ const styles = {
   },
 };
 
-// CSS অ্যানিমেশন
 const styleSheet = document.createElement('style');
 styleSheet.textContent = `
   @keyframes pulse {
