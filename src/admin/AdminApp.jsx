@@ -21,8 +21,11 @@ import Backup from './pages/Backup';
 import ActivityLogs from './pages/ActivityLogs';
 import RecycleBin from './pages/RecycleBin';
 
-function ProtectedRoute({ children }) {
-  const { isAuthenticated, loading } = useAdmin();
+// =============================================
+// ✅ প্রোটেক্টেড রাউট (রোল অনুযায়ী চেক)
+// =============================================
+function ProtectedRoute({ children, requiredRole }) {
+  const { isAuthenticated, loading, adminUser } = useAdmin();
 
   if (loading) {
     return (
@@ -37,6 +40,17 @@ function ProtectedRoute({ children }) {
     return <Navigate to="/login" replace />;
   }
 
+  // রোল চেক (যদি requiredRole দেওয়া থাকে)
+  if (requiredRole) {
+    const userRole = adminUser?.role;
+    if (requiredRole === 'super_admin' && userRole !== 'super_admin') {
+      return <Navigate to="/" replace />;
+    }
+    if (requiredRole === 'admin' && !['super_admin', 'admin'].includes(userRole)) {
+      return <Navigate to="/" replace />;
+    }
+  }
+
   return <AdminLayout>{children}</AdminLayout>;
 }
 
@@ -46,6 +60,8 @@ export default function AdminApp() {
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
+          
+          {/* সাধারণ পেজ (সব অ্যাডমিন দেখতে পারে) */}
           <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
           <Route path="/homepage" element={<ProtectedRoute><HomepageEditor /></ProtectedRoute>} />
           <Route path="/teachers" element={<ProtectedRoute><TeachersManager /></ProtectedRoute>} />
@@ -58,11 +74,13 @@ export default function AdminApp() {
           <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
           <Route path="/seo" element={<ProtectedRoute><SEO /></ProtectedRoute>} />
           <Route path="/media" element={<ProtectedRoute><MediaLibrary /></ProtectedRoute>} />
-          <Route path="/users" element={<ProtectedRoute><Users /></ProtectedRoute>} />
-          <Route path="/permissions" element={<ProtectedRoute><Permissions /></ProtectedRoute>} />
-          <Route path="/backup" element={<ProtectedRoute><Backup /></ProtectedRoute>} />
-          <Route path="/logs" element={<ProtectedRoute><ActivityLogs /></ProtectedRoute>} />
-          <Route path="/recycle" element={<ProtectedRoute><RecycleBin /></ProtectedRoute>} />
+          
+          {/* শুধু সুপার অ্যাডমিন দেখতে পারে */}
+          <Route path="/users" element={<ProtectedRoute requiredRole="super_admin"><Users /></ProtectedRoute>} />
+          <Route path="/permissions" element={<ProtectedRoute requiredRole="super_admin"><Permissions /></ProtectedRoute>} />
+          <Route path="/backup" element={<ProtectedRoute requiredRole="super_admin"><Backup /></ProtectedRoute>} />
+          <Route path="/logs" element={<ProtectedRoute requiredRole="super_admin"><ActivityLogs /></ProtectedRoute>} />
+          <Route path="/recycle" element={<ProtectedRoute requiredRole="super_admin"><RecycleBin /></ProtectedRoute>} />
         </Routes>
       </BrowserRouter>
     </AdminProvider>
