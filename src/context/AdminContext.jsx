@@ -17,6 +17,112 @@ export function AdminProvider({ children }) {
     checkSession();
   }, []);
 
+  // =============================================
+  // ✅ ইউজারের রোল ও পারমিশন লোড করুন
+  // =============================================
+  const loadUserRoleAndPermissions = async (userId, email) => {
+    try {
+      // ১. admin_users এ চেক করুন
+      const { data: adminData, error: adminError } = await supabase
+        .from('admin_users')
+        .select('*')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      if (adminData) {
+        console.log('✅ Admin found in DB:', adminData.role);
+        return adminData;
+      }
+
+      // ২. teachers টেবিলে চেক করুন (শিক্ষক কি না)
+      const { data: teacherData, error: teacherError } = await supabase
+        .from('teachers')
+        .select('*')
+        .eq('id', userId)
+        .maybeSingle();
+
+      if (teacherData) {
+        console.log('✅ Teacher found in DB:', teacherData.name);
+        
+        // ৩. teacher_permissions এ চেক করুন (পারমিশন আছে কি না)
+        const { data: permData, error: permError } = await supabase
+          .from('teacher_permissions')
+          .select('*')
+          .eq('teacher_email', email)
+          .limit(1);
+
+        if (permData && permData.length > 0) {
+          console.log('✅ Teacher has permissions, auto-login allowed');
+          
+          // অটোমেটিক অ্যাডমিন তৈরি করুন
+          const newAdmin = {
+            id: userId,
+            user_id: userId,
+            email: email,
+            name: teacherData.name || 'শিক্ষক',
+            role: 'teacher', // ডিফল্ট রোল
+            is_active: true,
+            created_at: new Date().toISOString()
+          };
+
+          // admin_users এ যোগ করুন
+          try {
+            await supabase
+              .from('admin_users')
+              .insert([{
+                user_id: userId,
+                email: email,
+                name: teacherData.name || 'শিক্ষক',
+                role: 'teacher',
+                is_active: true
+              }]);
+            console.log('✅ Auto-added to admin_users');
+          } catch (err) {
+            console.log('⚠️ Could not add to admin_users:', err);
+          }
+
+          return newAdmin;
+        }
+      }
+
+      // ৪. SUPER_ADMIN_EMAILS চেক করুন
+      if (SUPER_ADMIN_EMAILS.includes(email)) {
+        console.log('🔥 Super Admin found by email!');
+        const superAdmin = {
+          id: userId,
+          user_id: userId,
+          email: email,
+          name: 'ফিরোজ হাসান',
+          role: 'super_admin',
+          is_active: true,
+          created_at: new Date().toISOString()
+        };
+        
+        try {
+          await supabase
+            .from('admin_users')
+            .insert([{
+              user_id: userId,
+              email: email,
+              name: 'ফিরোজ হাসান',
+              role: 'super_admin',
+              is_active: true
+            }]);
+          console.log('✅ Super Admin added to database!');
+        } catch (err) {
+          console.log('⚠️ Could not add super admin:', err);
+        }
+        
+        return superAdmin;
+      }
+
+      return null;
+    } catch (error) {
+      console.error('❌ Load user role error:', error);
+      return null;
+    }
+  };
+
   const checkSession = async () => {
     setLoading(true);
     try {
@@ -25,55 +131,17 @@ export function AdminProvider({ children }) {
       if (session) {
         console.log('🔍 Session found for user:', session.user.id);
         
-        const { data, error } = await supabase
-          .from('admin_users')
-          .select('*')
-          .eq('user_id', session.user.id)
-          .maybeSingle();
+        const userData = await loadUserRoleAndPermissions(
+          session.user.id,
+          session.user.email
+        );
         
-        if (error) {
-          console.error('❌ Admin query error:', error);
-        }
-        
-        if (data) {
-          setAdminUser(data);
-          console.log('✅ Admin found in DB:', data.role);
+        if (userData) {
+          setAdminUser(userData);
+          console.log('✅ Admin loaded:', userData.role);
         } else {
-          // ডাটাবেসে না পেলে ইমেইল চেক করুন
-          const userEmail = session.user.email;
-          if (SUPER_ADMIN_EMAILS.includes(userEmail)) {
-            console.log('🔥 Super Admin found by email!');
-            const manualAdmin = {
-              id: session.user.id,
-              user_id: session.user.id,
-              email: userEmail,
-              name: 'ফিরোজ হাসান',
-              role: 'super_admin',
-              is_active: true,
-              created_at: new Date().toISOString()
-            };
-            setAdminUser(manualAdmin);
-            
-            // ডাটাবেসেও যোগ করে দিন
-            try {
-              await supabase
-                .from('admin_users')
-                .insert([{
-                  user_id: session.user.id,
-                  email: userEmail,
-                  name: 'ফিরোজ হাসান',
-                  role: 'super_admin',
-                  is_active: true,
-                  created_at: new Date().toISOString()
-                }]);
-              console.log('✅ Admin added to database!');
-            } catch (err) {
-              console.log('⚠️ Could not add to DB:', err);
-            }
-          } else {
-            console.warn('⚠️ No admin record and not in super admin list');
-            setAdminUser(null);
-          }
+          console.warn('⚠️ No admin record found');
+          setAdminUser(null);
         }
       } else {
         console.log('🔍 No session found');
@@ -84,6 +152,9 @@ export function AdminProvider({ children }) {
     setLoading(false);
   };
 
+  // =============================================
+  // ✅ লগইন ফাংশন
+  // =============================================
   const login = async (email, password) => {
     try {
       console.log('🔑 Attempting login for:', email);
@@ -104,59 +175,18 @@ export function AdminProvider({ children }) {
       }
 
       console.log('✅ User logged in:', data.user.email);
-      console.log('🆔 User ID:', data.user.id);
 
-      const { data: adminData, error: adminError } = await supabase
-        .from('admin_users')
-        .select('*')
-        .eq('user_id', data.user.id)
-        .maybeSingle();
+      const userData = await loadUserRoleAndPermissions(
+        data.user.id,
+        data.user.email
+      );
 
-      if (adminError) {
-        console.error('❌ Admin query error:', adminError);
-      }
-
-      if (adminData) {
-        console.log('✅ Admin found in DB:', adminData.role);
-        setAdminUser(adminData);
+      if (userData) {
+        setAdminUser(userData);
+        console.log('✅ Admin set:', userData.role);
         return { success: true };
       }
 
-      // ডাটাবেসে না পেলে ইমেইল চেক করুন
-      const userEmail = data.user.email;
-      if (SUPER_ADMIN_EMAILS.includes(userEmail)) {
-        console.log('🔥 Super Admin found by email!');
-        const manualAdmin = {
-          id: data.user.id,
-          user_id: data.user.id,
-          email: userEmail,
-          name: 'ফিরোজ হাসান',
-          role: 'super_admin',
-          is_active: true,
-          created_at: new Date().toISOString()
-        };
-        setAdminUser(manualAdmin);
-        
-        try {
-          await supabase
-            .from('admin_users')
-            .insert([{
-              user_id: data.user.id,
-              email: userEmail,
-              name: 'ফিরোজ হাসান',
-              role: 'super_admin',
-              is_active: true,
-              created_at: new Date().toISOString()
-            }]);
-          console.log('✅ Admin added to database!');
-        } catch (err) {
-          console.log('⚠️ Could not add to DB:', err);
-        }
-        
-        return { success: true };
-      }
-
-      console.error('❌ No admin record found for user_id:', data.user.id);
       return { success: false, error: 'এই ব্যবহারকারীর অ্যাডমিন অ্যাক্সেস নেই' };
 
     } catch (error) {
@@ -178,6 +208,8 @@ export function AdminProvider({ children }) {
       logout,
       isAuthenticated: !!adminUser,
       isSuperAdmin: adminUser?.role === 'super_admin',
+      isAdmin: adminUser?.role === 'admin' || adminUser?.role === 'super_admin',
+      isTeacher: adminUser?.role === 'teacher' || adminUser?.role === 'admin' || adminUser?.role === 'super_admin',
     }}>
       {children}
     </AdminContext.Provider>
