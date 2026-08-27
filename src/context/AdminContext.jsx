@@ -3,15 +3,15 @@ import { supabase } from '../supabaseClient';
 
 const AdminContext = createContext();
 
+// সুপার অ্যাডমিন ইমেইল লিস্ট (হার্ডকোডেড)
+const SUPER_ADMIN_EMAILS = [
+  'firojhasan808@gmail.com',
+  'firojhasan283@gmail.com'
+];
+
 export function AdminProvider({ children }) {
   const [adminUser, setAdminUser] = useState(null);
   const [loading, setLoading] = useState(true);
-
-  // 🔥 সুপার এডমিন ইমেইল লিস্ট (হার্ডকোডেড)
-  const SUPER_ADMIN_EMAILS = [
-    'firojhasan808@gmail.com',
-    'firojhasan283@gmail.com'
-  ];
 
   useEffect(() => {
     checkSession();
@@ -24,9 +24,7 @@ export function AdminProvider({ children }) {
       
       if (session) {
         console.log('🔍 Session found for user:', session.user.id);
-        console.log('📧 User email:', session.user.email);
         
-        // 🎯 প্রথমে ডাটাবেস থেকে চেক করুন
         const { data, error } = await supabase
           .from('admin_users')
           .select('*')
@@ -38,15 +36,13 @@ export function AdminProvider({ children }) {
         }
         
         if (data) {
-          // ডাটাবেসে পাওয়া গেলে সেট ব্যবহার করুন
           setAdminUser(data);
           console.log('✅ Admin found in DB:', data.role);
         } else {
-          // 🔥 ডাটাবেসে না পেলে ইমেইল চেক করুন
+          // ডাটাবেসে না পেলে ইমেইল চেক করুন
           const userEmail = session.user.email;
           if (SUPER_ADMIN_EMAILS.includes(userEmail)) {
             console.log('🔥 Super Admin found by email!');
-            // ম্যানুয়ালি Super Admin তৈরি করুন
             const manualAdmin = {
               id: session.user.id,
               user_id: session.user.id,
@@ -58,7 +54,7 @@ export function AdminProvider({ children }) {
             };
             setAdminUser(manualAdmin);
             
-            // 🔥 ডাটাবেসেও যোগ করে দিন (পরবর্তীবারের জন্য)
+            // ডাটাবেসেও যোগ করে দিন
             try {
               await supabase
                 .from('admin_users')
@@ -72,7 +68,7 @@ export function AdminProvider({ children }) {
                 }]);
               console.log('✅ Admin added to database!');
             } catch (err) {
-              console.log('⚠️ Could not add to DB (maybe already exists):', err);
+              console.log('⚠️ Could not add to DB:', err);
             }
           } else {
             console.warn('⚠️ No admin record and not in super admin list');
@@ -110,7 +106,6 @@ export function AdminProvider({ children }) {
       console.log('✅ User logged in:', data.user.email);
       console.log('🆔 User ID:', data.user.id);
 
-      // 🎯 ডাটাবেসে চেক করুন
       const { data: adminData, error: adminError } = await supabase
         .from('admin_users')
         .select('*')
@@ -122,13 +117,12 @@ export function AdminProvider({ children }) {
       }
 
       if (adminData) {
-        // ডাটাবেসে পাওয়া গেলে
         console.log('✅ Admin found in DB:', adminData.role);
         setAdminUser(adminData);
         return { success: true };
       }
 
-      // 🔥 ডাটাবেসে না পেলে ইমেইল চেক করুন
+      // ডাটাবেসে না পেলে ইমেইল চেক করুন
       const userEmail = data.user.email;
       if (SUPER_ADMIN_EMAILS.includes(userEmail)) {
         console.log('🔥 Super Admin found by email!');
@@ -143,7 +137,6 @@ export function AdminProvider({ children }) {
         };
         setAdminUser(manualAdmin);
         
-        // 🔥 ডাটাবেসেও যোগ করে দিন
         try {
           await supabase
             .from('admin_users')
