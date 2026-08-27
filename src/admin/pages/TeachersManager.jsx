@@ -1,7 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../supabaseClient';
+import { useAdmin } from '../../context/AdminContext';
+import { usePermissions } from '../../hooks/usePermissions';
+import TeacherPermissionsModal from '../components/TeacherPermissionsModal';
 
 export default function TeachersManager() {
+  const { adminUser } = useAdmin();
+  const { hasPermission, canGrantPermission } = usePermissions();
   const [teachers, setTeachers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -14,10 +19,18 @@ export default function TeachersManager() {
     email: '',
     photo_url: '',
   });
+  const [selectedTeacher, setSelectedTeacher] = useState(null);
+  const [showPermissionsModal, setShowPermissionsModal] = useState(false);
+
+  // চেক করুন ইউজারের শিক্ষক ব্যবস্থাপনা পারমিশন আছে কিনা
+  const canManageTeachers = hasPermission('manage_teachers');
+  const canManagePermissions = hasPermission('manage_permissions');
 
   useEffect(() => {
-    fetchTeachers();
-  }, []);
+    if (canManageTeachers) {
+      fetchTeachers();
+    }
+  }, [canManageTeachers]);
 
   const fetchTeachers = async () => {
     setLoading(true);
@@ -32,6 +45,10 @@ export default function TeachersManager() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!canManageTeachers) {
+      alert('আপনার শিক্ষক যোগ করার অনুমতি নেই');
+      return;
+    }
     if (editing) {
       await supabase.from('teachers').update(formData).eq('id', editing);
     } else {
@@ -44,23 +61,56 @@ export default function TeachersManager() {
   };
 
   const handleEdit = (teacher) => {
+    if (!canManageTeachers) {
+      alert('আপনার শিক্ষক এডিট করার অনুমতি নেই');
+      return;
+    }
     setEditing(teacher.id);
     setFormData(teacher);
     setShowForm(true);
   };
 
   const handleDelete = async (id) => {
+    if (!canManageTeachers) {
+      alert('আপনার শিক্ষক ডিলিট করার অনুমতি নেই');
+      return;
+    }
     if (confirm('নিশ্চিতভাবে ডিলিট করতে চান?')) {
       await supabase.from('teachers').delete().eq('id', id);
       fetchTeachers();
     }
   };
 
+  const handlePermissionsClick = (teacher) => {
+    if (!canManagePermissions) {
+      alert('আপনার পারমিশন পরিবর্তনের অনুমতি নেই');
+      return;
+    }
+    setSelectedTeacher(teacher);
+    setShowPermissionsModal(true);
+  };
+
+  // পারমিশন না থাকলে মেসেজ দেখান
+  if (!canManageTeachers) {
+    return (
+      <div style={styles.noAccess}>
+        <span style={styles.noAccessIcon}>🔒</span>
+        <h3 style={styles.noAccessTitle}>অ্যাক্সেস নেই</h3>
+        <p style={styles.noAccessText}>আপনার শিক্ষক ব্যবস্থাপনা দেখার অনুমতি নেই</p>
+      </div>
+    );
+  }
+
   return (
     <div style={styles.container}>
       <div style={styles.header}>
         <h2 style={styles.title}>👨‍🏫 শিক্ষক ব্যবস্থাপনা</h2>
-        <button onClick={() => { setShowForm(true); setEditing(null); setFormData({ name: '', designation: '', subject: '', phone: '', email: '', photo_url: '' }); }} style={styles.addBtn}>➕ নতুন শিক্ষক</button>
+        <button 
+          onClick={() => { setShowForm(true); setEditing(null); setFormData({ name: '', designation: '', subject: '', phone: '', email: '', photo_url: '' }); }} 
+          style={styles.addBtn}
+        >
+          ➕ নতুন শিক্ষক
+        </button>
       </div>
 
       {showForm && (
@@ -84,25 +134,57 @@ export default function TeachersManager() {
         <div style={styles.list}>
           {teachers.map((t) => (
             <div key={t.id} style={styles.item}>
-              <div>
+              <div style={styles.itemLeft}>
                 <strong>{t.name}</strong>
                 <span style={styles.badge}>{t.designation || 'শিক্ষক'}</span>
                 <span style={styles.badge2}>{t.subject}</span>
               </div>
               <div style={styles.actions}>
-                <button onClick={() => handleEdit(t)} style={styles.editBtn}>✏️</button>
-                <button onClick={() => handleDelete(t.id)} style={styles.deleteBtn}>🗑️</button>
+                <button onClick={() => handleEdit(t)} style={styles.editBtn} title="এডিট">✏️</button>
+                {canManagePermissions && (
+                  <button 
+                    onClick={() => handlePermissionsClick(t)} 
+                    style={styles.permissionBtn} 
+                    title="পারমিশন সেটিংস"
+                  >
+                    ⚙️
+                  </button>
+                )}
+                <button onClick={() => handleDelete(t.id)} style={styles.deleteBtn} title="ডিলিট">🗑️</button>
               </div>
             </div>
           ))}
         </div>
       )}
+
+      {/* পারমিশন মোডাল */}
+      <TeacherPermissionsModal
+        teacher={selectedTeacher}
+        isOpen={showPermissionsModal}
+        onClose={() => {
+          setShowPermissionsModal(false);
+          setSelectedTeacher(null);
+        }}
+        onSuccess={() => {
+          fetchTeachers();
+        }}
+      />
     </div>
   );
 }
 
 const styles = {
   container: { maxWidth: '800px', margin: '0 auto' },
+  noAccess: {
+    textAlign: 'center',
+    padding: '60px 20px',
+    background: 'white',
+    borderRadius: '16px',
+    border: '1px solid #e2e8f0',
+  },
+  noAccessIcon: { fontSize: '48px', display: 'block', marginBottom: '12px' },
+  noAccessTitle: { fontSize: '20px', color: '#0f172a', margin: '0 0 8px 0' },
+  noAccessText: { fontSize: '14px', color: '#64748b', margin: 0 },
   header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '10px' },
   title: { fontSize: '22px', fontWeight: '700', color: '#0f172a', margin: 0 },
   addBtn: { background: '#16a34a', color: 'white', border: 'none', padding: '10px 18px', borderRadius: '10px', fontWeight: '600', cursor: 'pointer' },
@@ -113,9 +195,11 @@ const styles = {
   cancelBtn: { background: '#64748b', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '10px', fontWeight: '600', cursor: 'pointer' },
   list: { display: 'flex', flexDirection: 'column', gap: '8px' },
   item: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', background: 'white', borderRadius: '10px', border: '1px solid #e2e8f0', flexWrap: 'wrap', gap: '8px' },
-  badge: { background: '#dbeafe', color: '#2563eb', padding: '2px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: '600', marginLeft: '8px' },
-  badge2: { background: '#dcfce7', color: '#16a34a', padding: '2px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: '600', marginLeft: '4px' },
+  itemLeft: { display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' },
+  badge: { background: '#dbeafe', color: '#2563eb', padding: '2px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: '600' },
+  badge2: { background: '#dcfce7', color: '#16a34a', padding: '2px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: '600' },
   actions: { display: 'flex', gap: '6px' },
-  editBtn: { background: '#f1f5f9', border: 'none', padding: '4px 10px', borderRadius: '6px', cursor: 'pointer' },
-  deleteBtn: { background: '#fee2e2', border: 'none', padding: '4px 10px', borderRadius: '6px', cursor: 'pointer' },
+  editBtn: { background: '#f1f5f9', border: 'none', padding: '4px 10px', borderRadius: '6px', cursor: 'pointer', fontSize: '14px' },
+  permissionBtn: { background: '#fef3c7', border: 'none', padding: '4px 10px', borderRadius: '6px', cursor: 'pointer', fontSize: '14px' },
+  deleteBtn: { background: '#fee2e2', border: 'none', padding: '4px 10px', borderRadius: '6px', cursor: 'pointer', fontSize: '14px' },
 };
