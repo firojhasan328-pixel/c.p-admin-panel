@@ -7,7 +7,7 @@ export default function GalleryManager() {
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [formData, setFormData] = useState({ name: '', description: '' });
+  const [formData, setFormData] = useState({ name: '', description: '', slug: '' });
   const [uploading, setUploading] = useState(false);
   const [urlInput, setUrlInput] = useState('');
   const [urlUploading, setUrlUploading] = useState(false);
@@ -63,22 +63,43 @@ export default function GalleryManager() {
   };
 
   // =============================================
-  // ✅ ক্যাটাগরি যোগ/আপডেট
+  // ✅ স্লাগ জেনারেট (ইংরেজি ফোল্ডার নাম)
+  // =============================================
+  const generateSlug = (name) => {
+    return name
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, '') // শুধু a-z, 0-9, space, - রাখুন
+      .replace(/\s+/g, '-') // space কে - দিয়ে প্রতিস্থাপন
+      .replace(/-+/g, '-') // একাধিক - কে একটিতে পরিণত
+      .replace(/^-|-$/g, ''); // শুরু ও শেষের - সরান
+  };
+
+  // =============================================
+  // ✅ ক্যাটাগরি যোগ/আপডেট (slug সহ)
   // =============================================
   const handleCategorySubmit = async (e) => {
     e.preventDefault();
+    
+    const slug = generateSlug(formData.name) || 'category-' + Date.now();
+    const dataToSave = {
+      name: formData.name,
+      description: formData.description || '',
+      slug: slug,
+    };
+
     if (selectedCategory) {
       await supabase
         .from('gallery_categories')
-        .update(formData)
+        .update(dataToSave)
         .eq('id', selectedCategory.id);
     } else {
       await supabase
         .from('gallery_categories')
-        .insert([formData]);
+        .insert([dataToSave]);
     }
     setShowForm(false);
-    setFormData({ name: '', description: '' });
+    setFormData({ name: '', description: '', slug: '' });
     fetchCategories();
     setSuccessMessage('✅ ক্যাটাগরি সফলভাবে সংরক্ষণ করা হয়েছে!');
     setTimeout(() => setSuccessMessage(''), 3000);
@@ -98,18 +119,6 @@ export default function GalleryManager() {
   };
 
   // =============================================
-  // ✅ ফোল্ডারের নাম স্যানিটাইজ (স্পেস ও বিশেষ ক্যারেক্টার সরান)
-  // =============================================
-  const sanitizeFolderName = (name) => {
-    return name
-      .trim()
-      .toLowerCase()
-      .replace(/[^a-z0-9\-]/g, '-') // শুধু a-z, 0-9, - অনুমোদিত
-      .replace(/-+/g, '-') // একাধিক - কে একটিতে পরিণত
-      .replace(/^-|-$/g, ''); // শুরু ও শেষের - সরান
-  };
-
-  // =============================================
   // ✅ 📤 একাধিক ছবি আপলোড (ফাইল থেকে)
   // =============================================
   const handleFileUpload = async (e) => {
@@ -122,8 +131,8 @@ export default function GalleryManager() {
     setUploading(true);
     setSuccessMessage('');
 
-    // ফোল্ডারের নাম স্যানিটাইজ করুন
-    const folderName = sanitizeFolderName(selectedCategory.name);
+    // ✅ slug ব্যবহার করুন (ইংরেজি ফোল্ডার নাম)
+    const folderName = selectedCategory.slug || generateSlug(selectedCategory.name) || 'category-' + Date.now();
     if (!folderName) {
       alert('ক্যাটাগরির নাম সঠিক নয়!');
       setUploading(false);
@@ -133,7 +142,6 @@ export default function GalleryManager() {
     try {
       let successCount = 0;
       for (let file of files) {
-        // ফাইল সাইজ চেক (max 5MB)
         if (file.size > 5 * 1024 * 1024) {
           alert(`${file.name} - ফাইল সাইজ ৫MB এর বেশি!`);
           continue;
@@ -143,7 +151,6 @@ export default function GalleryManager() {
         const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
         const filePath = `${folderName}/${fileName}`;
 
-        // Supabase Storage এ আপলোড
         const { error: uploadError } = await supabase.storage
           .from('gallery-images')
           .upload(filePath, file);
@@ -153,7 +160,6 @@ export default function GalleryManager() {
           continue;
         }
 
-        // gallery_images টেবিলে সেভ
         const { error: dbError } = await supabase
           .from('gallery_images')
           .insert([{
@@ -199,26 +205,21 @@ export default function GalleryManager() {
     setSuccessMessage('');
 
     try {
-      // URL ভ্যালিডেশন
       if (!urlInput.startsWith('http://') && !urlInput.startsWith('https://')) {
         throw new Error('সঠিক URL দিন (http:// বা https:// দিয়ে শুরু)');
       }
 
-      // ✅ image_path NULL রেখে শুধু image_url দিয়ে ইনসার্ট করুন
       const { error } = await supabase
         .from('gallery_images')
         .insert([{
           category_id: selectedCategory.id,
-          image_path: null, // ✅ NULL allowed
+          image_path: null,
           image_url: urlInput,
           title: urlInput.split('/').pop() || 'URL ইমেজ',
           is_featured: false,
         }]);
 
-      if (error) {
-        console.error('DB error:', error);
-        throw new Error(error.message);
-      }
+      if (error) throw new Error(error.message);
 
       setSuccessMessage('✅ URL ইমেজ সফলভাবে যোগ করা হয়েছে!');
       setUrlInput('');
@@ -238,14 +239,12 @@ export default function GalleryManager() {
     if (!confirm('এই ছবি ডিলিট করতে চান?')) return;
 
     try {
-      // Storage থেকে ডিলিট (যদি image_path থাকে)
       if (image.image_path) {
         await supabase.storage
           .from('gallery-images')
           .remove([image.image_path]);
       }
 
-      // ডেটাবেস থেকে ডিলিট
       await supabase
         .from('gallery_images')
         .delete()
@@ -259,7 +258,7 @@ export default function GalleryManager() {
   };
 
   // =============================================
-  // ✅ ফিচার্ড টগল (হোমপেজে দেখান)
+  // ✅ ফিচার্ড টগল
   // =============================================
   const handleToggleFeatured = async (imageId, currentStatus) => {
     try {
@@ -297,7 +296,7 @@ export default function GalleryManager() {
       <div style={styles.header}>
         <h2 style={styles.title}>🖼️ গ্যালারি ব্যবস্থাপনা</h2>
         <button
-          onClick={() => { setShowForm(true); setSelectedCategory(null); setFormData({ name: '', description: '' }); }}
+          onClick={() => { setShowForm(true); setSelectedCategory(null); setFormData({ name: '', description: '', slug: '' }); }}
           style={styles.addBtn}
         >
           ➕ নতুন ক্যাটাগরি
@@ -310,7 +309,7 @@ export default function GalleryManager() {
             name="name"
             value={formData.name}
             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-            placeholder="ক্যাটাগরি নাম"
+            placeholder="ক্যাটাগরি নাম (বাংলা)"
             style={styles.input}
             required
           />
