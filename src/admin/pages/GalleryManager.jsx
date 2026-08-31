@@ -41,7 +41,6 @@ export default function GalleryManager() {
       .eq('category_id', categoryId)
       .order('created_at', { ascending: false });
     
-    // প্রতিটি ছবির জন্য পাবলিক URL তৈরি
     const imagesWithUrls = await Promise.all((data || []).map(async (img) => {
       if (img.image_path) {
         const { data: urlData } = supabase.storage
@@ -99,16 +98,40 @@ export default function GalleryManager() {
   };
 
   // =============================================
+  // ✅ ফোল্ডারের নাম স্যানিটাইজ (স্পেস ও বিশেষ ক্যারেক্টার সরান)
+  // =============================================
+  const sanitizeFolderName = (name) => {
+    return name
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9\-]/g, '-') // শুধু a-z, 0-9, - অনুমোদিত
+      .replace(/-+/g, '-') // একাধিক - কে একটিতে পরিণত
+      .replace(/^-|-$/g, ''); // শুরু ও শেষের - সরান
+  };
+
+  // =============================================
   // ✅ 📤 একাধিক ছবি আপলোড (ফাইল থেকে)
   // =============================================
   const handleFileUpload = async (e) => {
     const files = e.target.files;
-    if (!files || files.length === 0 || !selectedCategory) return;
+    if (!files || files.length === 0 || !selectedCategory) {
+      alert('দয়া করে একটি ক্যাটাগরি সিলেক্ট করুন');
+      return;
+    }
 
     setUploading(true);
     setSuccessMessage('');
 
+    // ফোল্ডারের নাম স্যানিটাইজ করুন
+    const folderName = sanitizeFolderName(selectedCategory.name);
+    if (!folderName) {
+      alert('ক্যাটাগরির নাম সঠিক নয়!');
+      setUploading(false);
+      return;
+    }
+
     try {
+      let successCount = 0;
       for (let file of files) {
         // ফাইল সাইজ চেক (max 5MB)
         if (file.size > 5 * 1024 * 1024) {
@@ -118,14 +141,17 @@ export default function GalleryManager() {
 
         const fileExt = file.name.split('.').pop();
         const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
-        const filePath = `${selectedCategory.name}/${fileName}`;
+        const filePath = `${folderName}/${fileName}`;
 
         // Supabase Storage এ আপলোড
         const { error: uploadError } = await supabase.storage
           .from('gallery-images')
           .upload(filePath, file);
 
-        if (uploadError) throw uploadError;
+        if (uploadError) {
+          console.error('Upload error for', file.name, uploadError);
+          continue;
+        }
 
         // gallery_images টেবিলে সেভ
         const { error: dbError } = await supabase
@@ -133,14 +159,23 @@ export default function GalleryManager() {
           .insert([{
             category_id: selectedCategory.id,
             image_path: filePath,
+            image_url: null,
             title: file.name,
             is_featured: false,
           }]);
 
-        if (dbError) throw dbError;
+        if (dbError) {
+          console.error('DB error for', file.name, dbError);
+          continue;
+        }
+        successCount++;
       }
 
-      setSuccessMessage(`✅ ${files.length} টি ছবি আপলোড করা হয়েছে!`);
+      if (successCount > 0) {
+        setSuccessMessage(`✅ ${successCount} টি ছবি আপলোড করা হয়েছে!`);
+      } else {
+        setSuccessMessage('⚠️ কোনো ছবি আপলোড হয়নি!');
+      }
       fetchImages(selectedCategory.id);
       setTimeout(() => setSuccessMessage(''), 3000);
     } catch (err) {
@@ -169,16 +204,21 @@ export default function GalleryManager() {
         throw new Error('সঠিক URL দিন (http:// বা https:// দিয়ে শুরু)');
       }
 
+      // ✅ image_path NULL রেখে শুধু image_url দিয়ে ইনসার্ট করুন
       const { error } = await supabase
         .from('gallery_images')
         .insert([{
           category_id: selectedCategory.id,
+          image_path: null, // ✅ NULL allowed
           image_url: urlInput,
           title: urlInput.split('/').pop() || 'URL ইমেজ',
           is_featured: false,
         }]);
 
-      if (error) throw error;
+      if (error) {
+        console.error('DB error:', error);
+        throw new Error(error.message);
+      }
 
       setSuccessMessage('✅ URL ইমেজ সফলভাবে যোগ করা হয়েছে!');
       setUrlInput('');
@@ -223,7 +263,6 @@ export default function GalleryManager() {
   // =============================================
   const handleToggleFeatured = async (imageId, currentStatus) => {
     try {
-      // আগের ফিচার্ড আনফিচার্ড করুন
       if (currentStatus === false) {
         await supabase
           .from('gallery_images')
@@ -247,7 +286,6 @@ export default function GalleryManager() {
   // =============================================
   return (
     <div style={styles.container}>
-      {/* ✅ পপআপ মেসেজ */}
       {successMessage && (
         <div style={styles.popup}>
           <span style={styles.popupIcon}>✅</span>
@@ -256,9 +294,6 @@ export default function GalleryManager() {
         </div>
       )}
 
-      {/* =============================================
-          📌 ক্যাটাগরি তালিকা
-          ============================================= */}
       <div style={styles.header}>
         <h2 style={styles.title}>🖼️ গ্যালারি ব্যবস্থাপনা</h2>
         <button
@@ -330,9 +365,6 @@ export default function GalleryManager() {
         ))}
       </div>
 
-      {/* =============================================
-          📌 ক্যাটাগরি ভিউ (ছবি তালিকা)
-          ============================================= */}
       {selectedCategory && (
         <div style={styles.imageSection}>
           <div style={styles.imageHeader}>
@@ -340,7 +372,6 @@ export default function GalleryManager() {
               📂 {selectedCategory.name}
             </h3>
             <div style={styles.imageActions}>
-              {/* 📤 ফাইল আপলোড */}
               <label style={styles.uploadBtn}>
                 📤 ছবি আপলোড
                 <input
@@ -354,7 +385,6 @@ export default function GalleryManager() {
                 />
               </label>
 
-              {/* 🔗 URL আপলোড */}
               <div style={styles.urlUpload}>
                 <input
                   type="text"
@@ -427,9 +457,6 @@ export default function GalleryManager() {
   );
 }
 
-// =============================================
-// 🎨 প্রিমিয়াম স্টাইল
-// =============================================
 const styles = {
   container: { maxWidth: '1000px', margin: '0 auto', fontFamily: "'Hind Siliguri', sans-serif", padding: '0 16px' },
   popup: {
@@ -498,7 +525,6 @@ const styles = {
   imageDeleteBtn: { background: '#fee2e2', border: 'none', padding: '4px 10px', borderRadius: '6px', cursor: 'pointer' },
 };
 
-// অ্যানিমেশন
 const styleSheet = document.createElement('style');
 styleSheet.textContent = `
   @keyframes slideIn {
