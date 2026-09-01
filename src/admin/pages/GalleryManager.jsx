@@ -54,14 +54,15 @@ export default function GalleryManager() {
     fetchImages(cat.id);
   };
 
+  // =============================================
+  // ✅ সিম্পল slug জেনারেটর (শুধু ইংরেজি অক্ষর ও সংখ্যা)
+  // =============================================
   const generateSlug = (name) => {
-    return name
+    const cleaned = name
       .trim()
       .toLowerCase()
-      .replace(/[^a-z0-9\s-]/g, '')
-      .replace(/\s+/g, '-')
-      .replace(/-+/g, '-')
-      .replace(/^-|-$/g, '') || 'category-' + Date.now();
+      .replace(/[^a-z0-9]/g, '');
+    return cleaned || 'cat_' + Date.now();
   };
 
   const handleCategorySubmit = async (e) => {
@@ -101,7 +102,7 @@ export default function GalleryManager() {
   };
 
   // =============================================
-  // ✅ 📤 একাধিক ছবি আপলোড (ফাইল থেকে) — সমস্যা সমাধান করা হয়েছে
+  // ✅ 📤 ফাইল আপলোড (সরাসরি Storage-এ)
   // =============================================
   const handleFileUpload = async (e) => {
     const files = e.target.files;
@@ -121,11 +122,10 @@ export default function GalleryManager() {
     setErrorMessage('');
     setSuccessMessage('');
 
-    // ✅ slug ব্যবহার করুন (যদি না থাকে তাহলে তৈরি করুন)
+    // ✅ slug ব্যবহার করুন (ইংরেজি ফোল্ডার নাম)
     let folderName = selectedCategory.slug;
     if (!folderName) {
       folderName = generateSlug(selectedCategory.name);
-      // slug আপডেট করুন
       await supabase
         .from('gallery_categories')
         .update({ slug: folderName })
@@ -139,24 +139,20 @@ export default function GalleryManager() {
       return;
     }
 
-    console.log('📁 Uploading to folder:', folderName);
-
     try {
       let successCount = 0;
-      let errorMessages = [];
+      const errorFiles = [];
 
       for (let file of files) {
         // ফাইল সাইজ চেক (max 5MB)
         if (file.size > 5 * 1024 * 1024) {
-          errorMessages.push(`${file.name} - ফাইল সাইজ ৫MB এর বেশি!`);
+          errorFiles.push(`${file.name} (সাইজ ৫MB এর বেশি)`);
           continue;
         }
 
         const fileExt = file.name.split('.').pop();
         const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
         const filePath = `${folderName}/${fileName}`;
-
-        console.log('📄 Uploading:', filePath);
 
         // ✅ Supabase Storage এ আপলোড
         const { error: uploadError } = await supabase.storage
@@ -168,7 +164,7 @@ export default function GalleryManager() {
 
         if (uploadError) {
           console.error('❌ Upload error:', uploadError);
-          errorMessages.push(`${file.name} - আপলোড ব্যর্থ: ${uploadError.message}`);
+          errorFiles.push(`${file.name} (${uploadError.message})`);
           continue;
         }
 
@@ -185,7 +181,7 @@ export default function GalleryManager() {
 
         if (dbError) {
           console.error('❌ DB error:', dbError);
-          errorMessages.push(`${file.name} - ডেটাবেসে সেভ ব্যর্থ: ${dbError.message}`);
+          errorFiles.push(`${file.name} (ডেটাবেসে সেভ ব্যর্থ)`);
           continue;
         }
         successCount++;
@@ -194,19 +190,21 @@ export default function GalleryManager() {
       // ✅ ফলাফল দেখান
       if (successCount > 0) {
         setSuccessMessage(`✅ ${successCount} টি ছবি আপলোড করা হয়েছে!`);
-      } else {
-        setErrorMessage(`⚠️ কোনো ছবি আপলোড হয়নি!\n${errorMessages.join('\n')}`);
       }
 
-      if (errorMessages.length > 0 && successCount > 0) {
-        setErrorMessage(`⚠️ ${errorMessages.length} টি ফাইল ব্যর্থ হয়েছে`);
+      if (errorFiles.length > 0) {
+        setErrorMessage(`⚠️ ${errorFiles.length} টি ফাইল ব্যর্থ হয়েছে:\n${errorFiles.join('\n')}`);
+      }
+
+      if (successCount === 0 && errorFiles.length === 0) {
+        setErrorMessage('⚠️ কোনো ছবি আপলোড হয়নি!');
       }
 
       fetchImages(selectedCategory.id);
       setTimeout(() => {
         setSuccessMessage('');
         setErrorMessage('');
-      }, 4000);
+      }, 5000);
     } catch (err) {
       console.error('❌ Upload error:', err);
       setErrorMessage('⚠️ আপলোড ব্যর্থ: ' + err.message);
@@ -310,7 +308,6 @@ export default function GalleryManager() {
   // =============================================
   return (
     <div style={styles.container}>
-      {/* ✅ সাফল্যের পপআপ */}
       {successMessage && (
         <div style={styles.popupSuccess}>
           <span style={styles.popupIcon}>✅</span>
@@ -319,7 +316,6 @@ export default function GalleryManager() {
         </div>
       )}
 
-      {/* ⚠️ ত্রুটির পপআপ */}
       {errorMessage && (
         <div style={styles.popupError}>
           <span style={styles.popupIcon}>⚠️</span>
