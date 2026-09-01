@@ -120,14 +120,12 @@ export default function HomepageEditor() {
       wrapperStart = `<span style="color:${value}">`;
       wrapperEnd = '</span>';
     } else if (type === 'remove') {
-      // সরলীকৃত: শুধু ট্যাগ সরান
       const clean = selectedText.replace(/<[^>]*>/g, '');
       textarea.value = before + clean + after;
       setEditValue(textarea.value);
       return;
     }
 
-    // যদি কোনো টেক্সট সিলেক্ট না থাকে, তাহলে পুরো টেক্সটে প্রয়োগ করুন
     if (!selectedText) {
       const newValue = before + wrapperStart + wrapperEnd + after;
       textarea.value = newValue;
@@ -319,7 +317,9 @@ export default function HomepageEditor() {
           ))}
         </div>
 
-        {/* ✅ বিশেষত্ব */}
+        {/* =============================================
+            ✅ বিশেষত্ব (আপডেটেড)
+            ============================================= */}
         <div style={styles.section}>
           <h4 style={styles.sectionTitle}>🟢 বিশেষত্ব</h4>
           {groupedFields.features.map((field) => (
@@ -333,10 +333,14 @@ export default function HomepageEditor() {
                     value={editValue}
                     onChange={handleEditChange}
                     style={styles.editTextarea}
-                    rows="5"
+                    rows="6"
                     placeholder={field.placeholder || ''}
                     autoFocus
                   />
+                  {/* ✅ হেল্প টেক্সট */}
+                  <small style={styles.helpText}>
+                    💡 প্রতিটি আইটেম নতুন লাইনে লিখুন। এন্টার (Enter) চাপ দিয়ে নতুন লাইন তৈরি করুন।
+                  </small>
                   <div style={styles.editActions}>
                     <button onClick={() => handleEditSubmit(field.id)} style={styles.editSaveBtn}>
                       💾 সংরক্ষণ
@@ -348,9 +352,11 @@ export default function HomepageEditor() {
                 </div>
               ) : (
                 <div style={styles.fieldDisplay}>
-                  <span style={styles.fieldValue}>
+                  <span style={styles.fieldValuePreview}>
                     {values[field.id] ? (
-                      <div dangerouslySetInnerHTML={{ __html: values[field.id].replace(/\n/g, '<br/>') }} />
+                      <div style={{ whiteSpace: 'pre-line' }}>
+                        {values[field.id]}
+                      </div>
                     ) : (
                       field.placeholder || '—'
                     )}
@@ -556,6 +562,14 @@ const styles = {
     flex: 1,
     wordBreak: 'break-word',
   },
+  // ✅ নতুন স্টাইল (বিশেষত্ব প্রিভিউ)
+  fieldValuePreview: {
+    flex: 1,
+    wordBreak: 'break-word',
+    whiteSpace: 'pre-line',
+    fontSize: '14px',
+    color: '#0f172a',
+  },
   editIconBtn: {
     background: '#f1f5f9',
     border: 'none',
@@ -589,6 +603,16 @@ const styles = {
     fontFamily: 'inherit',
     resize: 'vertical',
     minHeight: '60px',
+  },
+  // ✅ হেল্প টেক্সট স্টাইল
+  helpText: {
+    display: 'block',
+    color: '#64748b',
+    fontSize: '12px',
+    marginTop: '4px',
+    padding: '4px 8px',
+    background: '#f1f5f9',
+    borderRadius: '6px',
   },
   editActions: {
     display: 'flex',
