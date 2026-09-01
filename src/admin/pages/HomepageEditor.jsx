@@ -1,15 +1,37 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../supabaseClient';
-import { useAdmin } from '../../context/AdminContext';
+
+// =============================================
+// ✅ সিম্পল WYSIWYG টুলবার (বোল্ড, ইটালিক, কালার)
+// =============================================
+const Toolbar = ({ onFormat }) => (
+  <div style={styles.toolbar}>
+    <button onClick={() => onFormat('bold')} style={styles.toolBtn} title="বোল্ড">𝐁</button>
+    <button onClick={() => onFormat('italic')} style={styles.toolBtn} title="ইটালিক">𝑰</button>
+    <button onClick={() => onFormat('underline')} style={styles.toolBtn} title="আন্ডারলাইন">U</button>
+    <input
+      type="color"
+      onChange={(e) => onFormat('color', e.target.value)}
+      style={styles.colorPicker}
+      title="রঙ"
+    />
+    <button onClick={() => onFormat('remove')} style={styles.toolBtn} title="ফরম্যাট সরান">↺</button>
+  </div>
+);
 
 export default function HomepageEditor() {
-  const { adminUser } = useAdmin();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [success, setSuccess] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
   const [fields, setFields] = useState([]);
   const [values, setValues] = useState({});
+  const [editingField, setEditingField] = useState(null);
+  const [editValue, setEditValue] = useState('');
 
+  // =============================================
+  // ✅ ডেটা লোড
+  // =============================================
   useEffect(() => {
     loadFields();
   }, []);
@@ -21,7 +43,7 @@ export default function HomepageEditor() {
         .from('cms_fields')
         .select('*')
         .eq('category', 'homepage')
-        .order('sort_order');
+        .order('sort_order', { ascending: true });
 
       if (fieldData) {
         setFields(fieldData);
@@ -38,96 +60,591 @@ export default function HomepageEditor() {
       }
     } catch (error) {
       console.error('Load error:', error);
+      setErrorMessage('⚠️ ডেটা লোড করতে সমস্যা');
     }
     setLoading(false);
   };
 
-  const handleChange = (fieldId, value) => {
-    setValues({ ...values, [fieldId]: value });
-  };
-
-  const handleSave = async () => {
+  // =============================================
+  // ✅ ফিল্ড আপডেট (ইনলাইন এডিট)
+  // =============================================
+  const updateField = async (fieldId, value) => {
     setSaving(true);
-    setSuccess('');
     try {
-      for (const [fieldId, value] of Object.entries(values)) {
-        await supabase
-          .from('cms_values')
-          .upsert({
-            field_id: fieldId,
-            value: value,
-            updated_by: adminUser?.user_id,
-          }, { onConflict: 'field_id' });
-      }
-      setSuccess('✅ সফলভাবে সংরক্ষণ করা হয়েছে!');
-      setTimeout(() => setSuccess(''), 3000);
+      await supabase
+        .from('cms_values')
+        .upsert({
+          field_id: fieldId,
+          value: value,
+        }, { onConflict: 'field_id' });
+
+      setValues(prev => ({ ...prev, [fieldId]: value }));
+      setSuccessMessage('✅ সফলভাবে সংরক্ষণ করা হয়েছে!');
+      setTimeout(() => setSuccessMessage(''), 3000);
     } catch (error) {
-      console.error('Save error:', error);
-      alert('সংরক্ষণ করতে সমস্যা হয়েছে');
+      console.error('Update error:', error);
+      setErrorMessage('⚠️ সংরক্ষণ করতে সমস্যা');
+      setTimeout(() => setErrorMessage(''), 3000);
     }
     setSaving(false);
+    setEditingField(null);
   };
 
-  if (loading) return <p>⏳ লোড হচ্ছে...</p>;
+  // =============================================
+  // ✅ WYSIWYG ফরম্যাটিং
+  // =============================================
+  const applyFormat = (fieldId, type, value = null) => {
+    const textarea = document.getElementById(`editor-${fieldId}`);
+    if (!textarea) return;
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const selectedText = textarea.value.substring(start, end);
+    const before = textarea.value.substring(0, start);
+    const after = textarea.value.substring(end);
+
+    let formattedText = selectedText;
+    let wrapperStart = '';
+    let wrapperEnd = '';
+
+    if (type === 'bold') {
+      wrapperStart = '<b>';
+      wrapperEnd = '</b>';
+    } else if (type === 'italic') {
+      wrapperStart = '<i>';
+      wrapperEnd = '</i>';
+    } else if (type === 'underline') {
+      wrapperStart = '<u>';
+      wrapperEnd = '</u>';
+    } else if (type === 'color') {
+      wrapperStart = `<span style="color:${value}">`;
+      wrapperEnd = '</span>';
+    } else if (type === 'remove') {
+      // সরলীকৃত: শুধু ট্যাগ সরান
+      const clean = selectedText.replace(/<[^>]*>/g, '');
+      textarea.value = before + clean + after;
+      setEditValue(textarea.value);
+      return;
+    }
+
+    // যদি কোনো টেক্সট সিলেক্ট না থাকে, তাহলে পুরো টেক্সটে প্রয়োগ করুন
+    if (!selectedText) {
+      const newValue = before + wrapperStart + wrapperEnd + after;
+      textarea.value = newValue;
+      setEditValue(newValue);
+      return;
+    }
+
+    const newValue = before + wrapperStart + formattedText + wrapperEnd + after;
+    textarea.value = newValue;
+    setEditValue(newValue);
+  };
+
+  // =============================================
+  // ✅ এডিট শুরু
+  // =============================================
+  const startEdit = (field) => {
+    setEditingField(field.id);
+    setEditValue(values[field.id] || '');
+  };
+
+  const handleEditChange = (e) => {
+    setEditValue(e.target.value);
+  };
+
+  const handleEditSubmit = (fieldId) => {
+    if (editValue.trim() === '') {
+      setErrorMessage('⚠️ ফিল্ড খালি রাখা যাবে না!');
+      setTimeout(() => setErrorMessage(''), 3000);
+      return;
+    }
+    updateField(fieldId, editValue);
+  };
+
+  // =============================================
+  // ✅ রেন্ডার
+  // =============================================
+  if (loading) {
+    return (
+      <div style={{ textAlign: 'center', padding: '60px 0' }}>
+        <p>⏳ লোড হচ্ছে...</p>
+      </div>
+    );
+  }
+
+  // গ্রুপ ফিল্ডস by সেকশন
+  const groupedFields = {
+    header: fields.filter(f => f.field_key.includes('header')),
+    about: fields.filter(f => f.field_key.includes('about')),
+    notice: fields.filter(f => f.field_key.includes('notice')),
+    features: fields.filter(f => f.field_key.includes('features')),
+    admission: fields.filter(f => f.field_key.includes('admission')),
+    footer: fields.filter(f => f.field_key.includes('footer')),
+  };
 
   return (
     <div style={styles.container}>
+      {/* ✅ পপআপ মেসেজ */}
+      {successMessage && (
+        <div style={styles.popupSuccess}>
+          <span style={styles.popupIcon}>✅</span>
+          <span style={styles.popupText}>{successMessage}</span>
+          <button onClick={() => setSuccessMessage('')} style={styles.popupClose}>✕</button>
+        </div>
+      )}
+
+      {errorMessage && (
+        <div style={styles.popupError}>
+          <span style={styles.popupIcon}>⚠️</span>
+          <span style={styles.popupText}>{errorMessage}</span>
+          <button onClick={() => setErrorMessage('')} style={styles.popupClose}>✕</button>
+        </div>
+      )}
+
       <h2 style={styles.title}>🏠 হোমপেজ এডিটর</h2>
-      <p style={styles.subtitle}>হোমপেজের সব কন্টেন্ট এখান থেকে এডিট করুন</p>
+      <p style={styles.subtitle}>হোমপেজের সব কন্টেন্ট এখান থেকে লাইভ এডিট করুন</p>
 
-      {success && <div style={styles.success}>{success}</div>}
+      {/* =============================================
+          📌 লাইভ প্রিভিউ + এডিট
+          ============================================= */}
+      <div style={styles.previewSection}>
+        <h3 style={styles.previewTitle}>📌 হোমপেজ প্রিভিউ (লাইভ)</h3>
 
-      <div style={styles.form}>
-        {fields.map((field) => (
-          <div key={field.id} style={styles.field}>
-            <label style={styles.label}>{field.label}</label>
-            {field.field_type === 'text' && (
-              <input
-                type="text"
-                value={values[field.id] || ''}
-                onChange={(e) => handleChange(field.id, e.target.value)}
-                placeholder={field.placeholder}
-                style={styles.input}
-              />
-            )}
-            {field.field_type === 'rich_text' && (
-              <textarea
-                rows="4"
-                value={values[field.id] || ''}
-                onChange={(e) => handleChange(field.id, e.target.value)}
-                placeholder={field.placeholder}
-                style={styles.textarea}
-              />
-            )}
-            {field.field_type === 'image' && (
-              <input
-                type="text"
-                value={values[field.id] || ''}
-                onChange={(e) => handleChange(field.id, e.target.value)}
-                placeholder="https://example.com/image.jpg"
-                style={styles.input}
-              />
-            )}
-          </div>
-        ))}
+        {/* ✅ হেডার সেকশন */}
+        <div style={styles.section}>
+          <h4 style={styles.sectionTitle}>🟢 হেডার সেকশন</h4>
+          {groupedFields.header.map((field) => (
+            <div key={field.id} style={styles.fieldRow}>
+              <span style={styles.fieldLabel}>{field.label}:</span>
+              {editingField === field.id ? (
+                <div style={styles.editContainer}>
+                  <Toolbar onFormat={(type, val) => applyFormat(field.id, type, val)} />
+                  <textarea
+                    id={`editor-${field.id}`}
+                    value={editValue}
+                    onChange={handleEditChange}
+                    style={styles.editTextarea}
+                    rows="2"
+                    placeholder={field.placeholder || ''}
+                    autoFocus
+                  />
+                  <div style={styles.editActions}>
+                    <button onClick={() => handleEditSubmit(field.id)} style={styles.editSaveBtn}>
+                      💾 সংরক্ষণ
+                    </button>
+                    <button onClick={() => setEditingField(null)} style={styles.editCancelBtn}>
+                      ✕ বাতিল
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div style={styles.fieldDisplay}>
+                  <span style={styles.fieldValue}>{values[field.id] || field.placeholder || '—'}</span>
+                  <button onClick={() => startEdit(field)} style={styles.editIconBtn}>✏️</button>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
 
-        <button onClick={handleSave} disabled={saving} style={styles.saveBtn}>
-          {saving ? '⏳ সংরক্ষণ হচ্ছে...' : '💾 সংরক্ষণ করুন'}
-        </button>
+        {/* ✅ প্রধান শিক্ষকের বাণী */}
+        <div style={styles.section}>
+          <h4 style={styles.sectionTitle}>🟢 প্রধান শিক্ষকের বাণী</h4>
+          {groupedFields.about.map((field) => (
+            <div key={field.id} style={styles.fieldRow}>
+              <span style={styles.fieldLabel}>{field.label}:</span>
+              {editingField === field.id ? (
+                <div style={styles.editContainer}>
+                  <Toolbar onFormat={(type, val) => applyFormat(field.id, type, val)} />
+                  <textarea
+                    id={`editor-${field.id}`}
+                    value={editValue}
+                    onChange={handleEditChange}
+                    style={styles.editTextarea}
+                    rows="4"
+                    placeholder={field.placeholder || ''}
+                    autoFocus
+                  />
+                  <div style={styles.editActions}>
+                    <button onClick={() => handleEditSubmit(field.id)} style={styles.editSaveBtn}>
+                      💾 সংরক্ষণ
+                    </button>
+                    <button onClick={() => setEditingField(null)} style={styles.editCancelBtn}>
+                      ✕ বাতিল
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div style={styles.fieldDisplay}>
+                  <span style={styles.fieldValue}>{values[field.id] || field.placeholder || '—'}</span>
+                  <button onClick={() => startEdit(field)} style={styles.editIconBtn}>✏️</button>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {/* ✅ নোটিশ */}
+        <div style={styles.section}>
+          <h4 style={styles.sectionTitle}>🟢 নোটিশ বোর্ড</h4>
+          {groupedFields.notice.map((field) => (
+            <div key={field.id} style={styles.fieldRow}>
+              <span style={styles.fieldLabel}>{field.label}:</span>
+              {editingField === field.id ? (
+                <div style={styles.editContainer}>
+                  <input
+                    type="text"
+                    value={editValue}
+                    onChange={handleEditChange}
+                    style={styles.editInput}
+                    placeholder={field.placeholder || ''}
+                    autoFocus
+                  />
+                  <div style={styles.editActions}>
+                    <button onClick={() => handleEditSubmit(field.id)} style={styles.editSaveBtn}>
+                      💾 সংরক্ষণ
+                    </button>
+                    <button onClick={() => setEditingField(null)} style={styles.editCancelBtn}>
+                      ✕ বাতিল
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div style={styles.fieldDisplay}>
+                  <span style={styles.fieldValue}>{values[field.id] || field.placeholder || '—'}</span>
+                  <button onClick={() => startEdit(field)} style={styles.editIconBtn}>✏️</button>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {/* ✅ বিশেষত্ব */}
+        <div style={styles.section}>
+          <h4 style={styles.sectionTitle}>🟢 বিশেষত্ব</h4>
+          {groupedFields.features.map((field) => (
+            <div key={field.id} style={styles.fieldRow}>
+              <span style={styles.fieldLabel}>{field.label}:</span>
+              {editingField === field.id ? (
+                <div style={styles.editContainer}>
+                  <Toolbar onFormat={(type, val) => applyFormat(field.id, type, val)} />
+                  <textarea
+                    id={`editor-${field.id}`}
+                    value={editValue}
+                    onChange={handleEditChange}
+                    style={styles.editTextarea}
+                    rows="5"
+                    placeholder={field.placeholder || ''}
+                    autoFocus
+                  />
+                  <div style={styles.editActions}>
+                    <button onClick={() => handleEditSubmit(field.id)} style={styles.editSaveBtn}>
+                      💾 সংরক্ষণ
+                    </button>
+                    <button onClick={() => setEditingField(null)} style={styles.editCancelBtn}>
+                      ✕ বাতিল
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div style={styles.fieldDisplay}>
+                  <span style={styles.fieldValue}>
+                    {values[field.id] ? (
+                      <div dangerouslySetInnerHTML={{ __html: values[field.id].replace(/\n/g, '<br/>') }} />
+                    ) : (
+                      field.placeholder || '—'
+                    )}
+                  </span>
+                  <button onClick={() => startEdit(field)} style={styles.editIconBtn}>✏️</button>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {/* ✅ ভর্তি সেকশন */}
+        <div style={styles.section}>
+          <h4 style={styles.sectionTitle}>🟢 ভর্তি সেকশন</h4>
+          {groupedFields.admission.map((field) => (
+            <div key={field.id} style={styles.fieldRow}>
+              <span style={styles.fieldLabel}>{field.label}:</span>
+              {editingField === field.id ? (
+                <div style={styles.editContainer}>
+                  <input
+                    type="text"
+                    value={editValue}
+                    onChange={handleEditChange}
+                    style={styles.editInput}
+                    placeholder={field.placeholder || ''}
+                    autoFocus
+                  />
+                  <div style={styles.editActions}>
+                    <button onClick={() => handleEditSubmit(field.id)} style={styles.editSaveBtn}>
+                      💾 সংরক্ষণ
+                    </button>
+                    <button onClick={() => setEditingField(null)} style={styles.editCancelBtn}>
+                      ✕ বাতিল
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div style={styles.fieldDisplay}>
+                  <span style={styles.fieldValue}>{values[field.id] || field.placeholder || '—'}</span>
+                  <button onClick={() => startEdit(field)} style={styles.editIconBtn}>✏️</button>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {/* ✅ ফুটার */}
+        <div style={styles.section}>
+          <h4 style={styles.sectionTitle}>🟢 ফুটার</h4>
+          {groupedFields.footer.map((field) => (
+            <div key={field.id} style={styles.fieldRow}>
+              <span style={styles.fieldLabel}>{field.label}:</span>
+              {editingField === field.id ? (
+                <div style={styles.editContainer}>
+                  <input
+                    type="text"
+                    value={editValue}
+                    onChange={handleEditChange}
+                    style={styles.editInput}
+                    placeholder={field.placeholder || ''}
+                    autoFocus
+                  />
+                  <div style={styles.editActions}>
+                    <button onClick={() => handleEditSubmit(field.id)} style={styles.editSaveBtn}>
+                      💾 সংরক্ষণ
+                    </button>
+                    <button onClick={() => setEditingField(null)} style={styles.editCancelBtn}>
+                      ✕ বাতিল
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div style={styles.fieldDisplay}>
+                  <span style={styles.fieldValue}>{values[field.id] || field.placeholder || '—'}</span>
+                  <button onClick={() => startEdit(field)} style={styles.editIconBtn}>✏️</button>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
 }
 
+// =============================================
+// 🎨 প্রিমিয়াম স্টাইল
+// =============================================
 const styles = {
-  container: { maxWidth: '800px', margin: '0 auto' },
-  title: { fontSize: '24px', fontWeight: '700', color: '#0f172a', margin: '0 0 4px 0' },
-  subtitle: { fontSize: '14px', color: '#64748b', margin: '0 0 24px 0' },
-  success: { background: '#dcfce7', color: '#15803d', padding: '12px 16px', borderRadius: '10px', marginBottom: '16px', fontWeight: '600', borderLeft: '4px solid #16a34a' },
-  form: { display: 'flex', flexDirection: 'column', gap: '16px' },
-  field: { display: 'flex', flexDirection: 'column', gap: '4px' },
-  label: { fontSize: '13px', fontWeight: '600', color: '#334155' },
-  input: { padding: '10px 14px', borderRadius: '10px', border: '1.5px solid #e2e8f0', fontSize: '14px', outline: 'none', backgroundColor: '#f8fafc' },
-  textarea: { padding: '10px 14px', borderRadius: '10px', border: '1.5px solid #e2e8f0', fontSize: '14px', outline: 'none', backgroundColor: '#f8fafc', fontFamily: 'inherit', resize: 'vertical' },
-  saveBtn: { background: 'linear-gradient(135deg, #16a34a, #15803d)', color: 'white', border: 'none', padding: '14px', borderRadius: '12px', fontSize: '16px', fontWeight: '700', cursor: 'pointer', boxShadow: '0 6px 20px rgba(22,163,74,0.3)' },
+  container: {
+    maxWidth: '900px',
+    margin: '0 auto',
+    padding: '0 16px',
+    fontFamily: "'Hind Siliguri', sans-serif",
+  },
+  title: {
+    fontSize: '24px',
+    fontWeight: '700',
+    color: '#0f172a',
+    margin: '0 0 4px 0',
+  },
+  subtitle: {
+    fontSize: '14px',
+    color: '#64748b',
+    margin: '0 0 24px 0',
+  },
+  popupSuccess: {
+    position: 'fixed',
+    top: '20px',
+    right: '20px',
+    zIndex: 9999,
+    background: 'linear-gradient(135deg, #dcfce7, #bbf7d0)',
+    color: '#166534',
+    padding: '16px 24px',
+    borderRadius: '14px',
+    boxShadow: '0 10px 30px rgba(22, 163, 74, 0.3)',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+    animation: 'slideIn 0.5s ease',
+    border: '1px solid #86efac',
+    maxWidth: '400px',
+  },
+  popupError: {
+    position: 'fixed',
+    top: '20px',
+    right: '20px',
+    zIndex: 9999,
+    background: 'linear-gradient(135deg, #fee2e2, #fecaca)',
+    color: '#991b1b',
+    padding: '16px 24px',
+    borderRadius: '14px',
+    boxShadow: '0 10px 30px rgba(220, 38, 38, 0.3)',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+    animation: 'slideIn 0.5s ease',
+    border: '1px solid #fca5a5',
+    maxWidth: '400px',
+  },
+  popupIcon: { fontSize: '24px' },
+  popupText: { fontSize: '15px', fontWeight: '600', flex: 1 },
+  popupClose: {
+    background: 'none',
+    border: 'none',
+    fontSize: '18px',
+    cursor: 'pointer',
+    padding: '4px',
+  },
+  previewSection: {
+    background: 'white',
+    borderRadius: '16px',
+    padding: '24px',
+    border: '1px solid #e2e8f0',
+    boxShadow: '0 4px 12px rgba(0,0,0,0.04)',
+  },
+  previewTitle: {
+    fontSize: '18px',
+    fontWeight: '700',
+    color: '#0f172a',
+    margin: '0 0 16px 0',
+    borderBottom: '2px solid #f1f5f9',
+    paddingBottom: '10px',
+  },
+  section: {
+    marginBottom: '24px',
+    padding: '16px',
+    background: '#f8fafc',
+    borderRadius: '12px',
+    border: '1px solid #e2e8f0',
+  },
+  sectionTitle: {
+    fontSize: '15px',
+    fontWeight: '700',
+    color: '#0f172a',
+    margin: '0 0 12px 0',
+    paddingBottom: '8px',
+    borderBottom: '1px solid #e2e8f0',
+  },
+  fieldRow: {
+    marginBottom: '10px',
+    padding: '8px 12px',
+    background: 'white',
+    borderRadius: '8px',
+    border: '1px solid #f1f5f9',
+  },
+  fieldLabel: {
+    fontSize: '12px',
+    fontWeight: '600',
+    color: '#64748b',
+    display: 'block',
+    marginBottom: '4px',
+  },
+  fieldDisplay: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: '10px',
+  },
+  fieldValue: {
+    fontSize: '14px',
+    color: '#0f172a',
+    flex: 1,
+    wordBreak: 'break-word',
+  },
+  editIconBtn: {
+    background: '#f1f5f9',
+    border: 'none',
+    padding: '4px 10px',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    fontSize: '14px',
+    flexShrink: 0,
+  },
+  editContainer: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '8px',
+    width: '100%',
+  },
+  editInput: {
+    width: '100%',
+    padding: '8px 12px',
+    borderRadius: '8px',
+    border: '2px solid #16a34a',
+    fontSize: '14px',
+    outline: 'none',
+  },
+  editTextarea: {
+    width: '100%',
+    padding: '8px 12px',
+    borderRadius: '8px',
+    border: '2px solid #16a34a',
+    fontSize: '14px',
+    outline: 'none',
+    fontFamily: 'inherit',
+    resize: 'vertical',
+    minHeight: '60px',
+  },
+  editActions: {
+    display: 'flex',
+    gap: '8px',
+    flexWrap: 'wrap',
+  },
+  editSaveBtn: {
+    background: '#16a34a',
+    color: 'white',
+    border: 'none',
+    padding: '6px 16px',
+    borderRadius: '8px',
+    fontWeight: '600',
+    cursor: 'pointer',
+  },
+  editCancelBtn: {
+    background: '#64748b',
+    color: 'white',
+    border: 'none',
+    padding: '6px 16px',
+    borderRadius: '8px',
+    fontWeight: '600',
+    cursor: 'pointer',
+  },
+  toolbar: {
+    display: 'flex',
+    gap: '6px',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    padding: '6px 0',
+  },
+  toolBtn: {
+    background: '#f1f5f9',
+    border: 'none',
+    padding: '4px 10px',
+    borderRadius: '4px',
+    cursor: 'pointer',
+    fontSize: '14px',
+    fontWeight: '600',
+    color: '#334155',
+  },
+  colorPicker: {
+    width: '30px',
+    height: '30px',
+    padding: '2px',
+    border: '1px solid #e2e8f0',
+    borderRadius: '4px',
+    cursor: 'pointer',
+  },
 };
+
+const styleSheet = document.createElement('style');
+styleSheet.textContent = `
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateX(20px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+`;
+document.head.appendChild(styleSheet);
