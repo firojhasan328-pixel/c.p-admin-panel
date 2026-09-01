@@ -7,16 +7,14 @@ export default function GalleryManager() {
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [formData, setFormData] = useState({ name: '', description: '', slug: '' });
+  const [formData, setFormData] = useState({ name: '', description: '' });
   const [uploading, setUploading] = useState(false);
   const [urlInput, setUrlInput] = useState('');
   const [urlUploading, setUrlUploading] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
   const fileInputRef = useRef(null);
 
-  // =============================================
-  // ✅ সব ক্যাটাগরি লোড
-  // =============================================
   useEffect(() => {
     fetchCategories();
   }, []);
@@ -31,9 +29,6 @@ export default function GalleryManager() {
     setLoading(false);
   };
 
-  // =============================================
-  // ✅ ক্যাটাগরির ছবি লোড
-  // =============================================
   const fetchImages = async (categoryId) => {
     const { data } = await supabase
       .from('gallery_images')
@@ -54,34 +49,24 @@ export default function GalleryManager() {
     setImages(imagesWithUrls);
   };
 
-  // =============================================
-  // ✅ ক্যাটাগরি ক্লিক
-  // =============================================
   const handleCategoryClick = (cat) => {
     setSelectedCategory(cat);
     fetchImages(cat.id);
   };
 
-  // =============================================
-  // ✅ স্লাগ জেনারেট (ইংরেজি ফোল্ডার নাম)
-  // =============================================
   const generateSlug = (name) => {
     return name
       .trim()
       .toLowerCase()
-      .replace(/[^a-z0-9\s-]/g, '') // শুধু a-z, 0-9, space, - রাখুন
-      .replace(/\s+/g, '-') // space কে - দিয়ে প্রতিস্থাপন
-      .replace(/-+/g, '-') // একাধিক - কে একটিতে পরিণত
-      .replace(/^-|-$/g, ''); // শুরু ও শেষের - সরান
+      .replace(/[^a-z0-9\s-]/g, '')
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '') || 'category-' + Date.now();
   };
 
-  // =============================================
-  // ✅ ক্যাটাগরি যোগ/আপডেট (slug সহ)
-  // =============================================
   const handleCategorySubmit = async (e) => {
     e.preventDefault();
-    
-    const slug = generateSlug(formData.name) || 'category-' + Date.now();
+    const slug = generateSlug(formData.name);
     const dataToSave = {
       name: formData.name,
       description: formData.description || '',
@@ -99,15 +84,12 @@ export default function GalleryManager() {
         .insert([dataToSave]);
     }
     setShowForm(false);
-    setFormData({ name: '', description: '', slug: '' });
+    setFormData({ name: '', description: '' });
     fetchCategories();
     setSuccessMessage('✅ ক্যাটাগরি সফলভাবে সংরক্ষণ করা হয়েছে!');
     setTimeout(() => setSuccessMessage(''), 3000);
   };
 
-  // =============================================
-  // ✅ ক্যাটাগরি ডিলিট
-  // =============================================
   const handleCategoryDelete = async (id) => {
     if (!confirm('এই ক্যাটাগরি ও এর সব ছবি ডিলিট করতে চান?')) return;
     await supabase.from('gallery_categories').delete().eq('id', id);
@@ -119,31 +101,54 @@ export default function GalleryManager() {
   };
 
   // =============================================
-  // ✅ 📤 একাধিক ছবি আপলোড (ফাইল থেকে)
+  // ✅ 📤 একাধিক ছবি আপলোড (ফাইল থেকে) — সমস্যা সমাধান করা হয়েছে
   // =============================================
   const handleFileUpload = async (e) => {
     const files = e.target.files;
-    if (!files || files.length === 0 || !selectedCategory) {
-      alert('দয়া করে একটি ক্যাটাগরি সিলেক্ট করুন');
+    if (!files || files.length === 0) {
+      setErrorMessage('⚠️ কোনো ফাইল সিলেক্ট করা হয়নি!');
+      setTimeout(() => setErrorMessage(''), 3000);
+      return;
+    }
+
+    if (!selectedCategory) {
+      setErrorMessage('⚠️ দয়া করে একটি ক্যাটাগরি সিলেক্ট করুন!');
+      setTimeout(() => setErrorMessage(''), 3000);
       return;
     }
 
     setUploading(true);
+    setErrorMessage('');
     setSuccessMessage('');
 
-    // ✅ slug ব্যবহার করুন (ইংরেজি ফোল্ডার নাম)
-    const folderName = selectedCategory.slug || generateSlug(selectedCategory.name) || 'category-' + Date.now();
+    // ✅ slug ব্যবহার করুন (যদি না থাকে তাহলে তৈরি করুন)
+    let folderName = selectedCategory.slug;
     if (!folderName) {
-      alert('ক্যাটাগরির নাম সঠিক নয়!');
+      folderName = generateSlug(selectedCategory.name);
+      // slug আপডেট করুন
+      await supabase
+        .from('gallery_categories')
+        .update({ slug: folderName })
+        .eq('id', selectedCategory.id);
+      setSelectedCategory({ ...selectedCategory, slug: folderName });
+    }
+
+    if (!folderName) {
+      setErrorMessage('⚠️ ক্যাটাগরির slug তৈরি করা যায়নি!');
       setUploading(false);
       return;
     }
 
+    console.log('📁 Uploading to folder:', folderName);
+
     try {
       let successCount = 0;
+      let errorMessages = [];
+
       for (let file of files) {
+        // ফাইল সাইজ চেক (max 5MB)
         if (file.size > 5 * 1024 * 1024) {
-          alert(`${file.name} - ফাইল সাইজ ৫MB এর বেশি!`);
+          errorMessages.push(`${file.name} - ফাইল সাইজ ৫MB এর বেশি!`);
           continue;
         }
 
@@ -151,15 +156,23 @@ export default function GalleryManager() {
         const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
         const filePath = `${folderName}/${fileName}`;
 
+        console.log('📄 Uploading:', filePath);
+
+        // ✅ Supabase Storage এ আপলোড
         const { error: uploadError } = await supabase.storage
           .from('gallery-images')
-          .upload(filePath, file);
+          .upload(filePath, file, {
+            cacheControl: '3600',
+            upsert: false,
+          });
 
         if (uploadError) {
-          console.error('Upload error for', file.name, uploadError);
+          console.error('❌ Upload error:', uploadError);
+          errorMessages.push(`${file.name} - আপলোড ব্যর্থ: ${uploadError.message}`);
           continue;
         }
 
+        // ✅ gallery_images টেবিলে সেভ
         const { error: dbError } = await supabase
           .from('gallery_images')
           .insert([{
@@ -171,22 +184,33 @@ export default function GalleryManager() {
           }]);
 
         if (dbError) {
-          console.error('DB error for', file.name, dbError);
+          console.error('❌ DB error:', dbError);
+          errorMessages.push(`${file.name} - ডেটাবেসে সেভ ব্যর্থ: ${dbError.message}`);
           continue;
         }
         successCount++;
       }
 
+      // ✅ ফলাফল দেখান
       if (successCount > 0) {
         setSuccessMessage(`✅ ${successCount} টি ছবি আপলোড করা হয়েছে!`);
       } else {
-        setSuccessMessage('⚠️ কোনো ছবি আপলোড হয়নি!');
+        setErrorMessage(`⚠️ কোনো ছবি আপলোড হয়নি!\n${errorMessages.join('\n')}`);
       }
+
+      if (errorMessages.length > 0 && successCount > 0) {
+        setErrorMessage(`⚠️ ${errorMessages.length} টি ফাইল ব্যর্থ হয়েছে`);
+      }
+
       fetchImages(selectedCategory.id);
-      setTimeout(() => setSuccessMessage(''), 3000);
+      setTimeout(() => {
+        setSuccessMessage('');
+        setErrorMessage('');
+      }, 4000);
     } catch (err) {
-      console.error('Upload error:', err);
-      alert('আপলোড ব্যর্থ: ' + err.message);
+      console.error('❌ Upload error:', err);
+      setErrorMessage('⚠️ আপলোড ব্যর্থ: ' + err.message);
+      setTimeout(() => setErrorMessage(''), 3000);
     }
     setUploading(false);
     e.target.value = '';
@@ -197,11 +221,13 @@ export default function GalleryManager() {
   // =============================================
   const handleUrlUpload = async () => {
     if (!urlInput || !selectedCategory) {
-      alert('দয়া করে URL দিন এবং একটি ক্যাটাগরি সিলেক্ট করুন');
+      setErrorMessage('⚠️ দয়া করে URL দিন এবং একটি ক্যাটাগরি সিলেক্ট করুন');
+      setTimeout(() => setErrorMessage(''), 3000);
       return;
     }
 
     setUrlUploading(true);
+    setErrorMessage('');
     setSuccessMessage('');
 
     try {
@@ -227,7 +253,8 @@ export default function GalleryManager() {
       setTimeout(() => setSuccessMessage(''), 3000);
     } catch (err) {
       console.error('URL upload error:', err);
-      alert('URL ইমেজ যোগ করতে সমস্যা: ' + err.message);
+      setErrorMessage('⚠️ URL ইমেজ যোগ করতে সমস্যা: ' + err.message);
+      setTimeout(() => setErrorMessage(''), 3000);
     }
     setUrlUploading(false);
   };
@@ -253,13 +280,11 @@ export default function GalleryManager() {
       fetchImages(selectedCategory.id);
     } catch (err) {
       console.error('Delete error:', err);
-      alert('ডিলিট করতে সমস্যা হয়েছে');
+      setErrorMessage('⚠️ ডিলিট করতে সমস্যা হয়েছে');
+      setTimeout(() => setErrorMessage(''), 3000);
     }
   };
 
-  // =============================================
-  // ✅ ফিচার্ড টগল
-  // =============================================
   const handleToggleFeatured = async (imageId, currentStatus) => {
     try {
       if (currentStatus === false) {
@@ -285,18 +310,28 @@ export default function GalleryManager() {
   // =============================================
   return (
     <div style={styles.container}>
+      {/* ✅ সাফল্যের পপআপ */}
       {successMessage && (
-        <div style={styles.popup}>
+        <div style={styles.popupSuccess}>
           <span style={styles.popupIcon}>✅</span>
           <span style={styles.popupText}>{successMessage}</span>
           <button onClick={() => setSuccessMessage('')} style={styles.popupClose}>✕</button>
         </div>
       )}
 
+      {/* ⚠️ ত্রুটির পপআপ */}
+      {errorMessage && (
+        <div style={styles.popupError}>
+          <span style={styles.popupIcon}>⚠️</span>
+          <span style={styles.popupText}>{errorMessage}</span>
+          <button onClick={() => setErrorMessage('')} style={styles.popupClose}>✕</button>
+        </div>
+      )}
+
       <div style={styles.header}>
         <h2 style={styles.title}>🖼️ গ্যালারি ব্যবস্থাপনা</h2>
         <button
-          onClick={() => { setShowForm(true); setSelectedCategory(null); setFormData({ name: '', description: '', slug: '' }); }}
+          onClick={() => { setShowForm(true); setSelectedCategory(null); setFormData({ name: '', description: '' }); }}
           style={styles.addBtn}
         >
           ➕ নতুন ক্যাটাগরি
@@ -367,9 +402,7 @@ export default function GalleryManager() {
       {selectedCategory && (
         <div style={styles.imageSection}>
           <div style={styles.imageHeader}>
-            <h3 style={styles.imageTitle}>
-              📂 {selectedCategory.name}
-            </h3>
+            <h3 style={styles.imageTitle}>📂 {selectedCategory.name}</h3>
             <div style={styles.imageActions}>
               <label style={styles.uploadBtn}>
                 📤 ছবি আপলোড
@@ -458,16 +491,23 @@ export default function GalleryManager() {
 
 const styles = {
   container: { maxWidth: '1000px', margin: '0 auto', fontFamily: "'Hind Siliguri', sans-serif", padding: '0 16px' },
-  popup: {
+  popupSuccess: {
     position: 'fixed', top: '20px', right: '20px', zIndex: 9999,
     background: 'linear-gradient(135deg, #dcfce7, #bbf7d0)', color: '#166534',
     padding: '16px 24px', borderRadius: '14px', boxShadow: '0 10px 30px rgba(22, 163, 74, 0.3)',
     display: 'flex', alignItems: 'center', gap: '12px', animation: 'slideIn 0.5s ease',
     border: '1px solid #86efac', maxWidth: '400px',
   },
+  popupError: {
+    position: 'fixed', top: '20px', right: '20px', zIndex: 9999,
+    background: 'linear-gradient(135deg, #fee2e2, #fecaca)', color: '#991b1b',
+    padding: '16px 24px', borderRadius: '14px', boxShadow: '0 10px 30px rgba(220, 38, 38, 0.3)',
+    display: 'flex', alignItems: 'center', gap: '12px', animation: 'slideIn 0.5s ease',
+    border: '1px solid #fca5a5', maxWidth: '400px',
+  },
   popupIcon: { fontSize: '24px' },
   popupText: { fontSize: '15px', fontWeight: '600', flex: 1 },
-  popupClose: { background: 'none', border: 'none', fontSize: '18px', color: '#166534', cursor: 'pointer', padding: '4px' },
+  popupClose: { background: 'none', border: 'none', fontSize: '18px', cursor: 'pointer', padding: '4px' },
   header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '10px' },
   title: { fontSize: '22px', fontWeight: '700', color: '#0f172a', margin: 0 },
   addBtn: { background: '#16a34a', color: 'white', border: 'none', padding: '10px 18px', borderRadius: '10px', fontWeight: '600', cursor: 'pointer' },
