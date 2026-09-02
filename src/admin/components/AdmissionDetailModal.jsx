@@ -1,9 +1,10 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import { supabase } from '../../supabaseClient';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
 
 export default function AdmissionDetailModal({ admission, onClose, onUpdate }) {
   const [loading, setLoading] = useState(false);
-  const [activeImage, setActiveImage] = useState(null);
   const [imageViewerOpen, setImageViewerOpen] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [slideIndex, setSlideIndex] = useState(0);
@@ -33,20 +34,22 @@ export default function AdmissionDetailModal({ admission, onClose, onUpdate }) {
     setLoading(false);
   };
 
-  // ✅ PDF ডাউনলোড (html2canvas + jsPDF)
+  // ✅ PDF ডাউনলোড
   const downloadPDF = async (includeImages = true) => {
     setLoading(true);
     try {
-      const { default: html2canvas } = await import('html2canvas');
-      const { default: jsPDF } = await import('jspdf');
-
       const content = document.getElementById('pdf-content');
-      if (!content) return;
+      if (!content) {
+        alert('❌ PDF কন্টেন্ট পাওয়া যায়নি!');
+        setLoading(false);
+        return;
+      }
 
       const canvas = await html2canvas(content, {
         scale: 2,
         useCORS: true,
         logging: false,
+        backgroundColor: '#ffffff',
       });
 
       const imgData = canvas.toDataURL('image/png');
@@ -103,7 +106,6 @@ export default function AdmissionDetailModal({ admission, onClose, onUpdate }) {
         <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
           <button onClick={onClose} style={styles.closeBtn}>✕</button>
 
-          {/* ✅ ফরম নাম্বার */}
           <div style={styles.formNumberHeader}>
             <span style={styles.formNumberLabel}>📋 ফরম নাম্বার</span>
             <span style={styles.formNumber}>{admission.form_number || 'NA'}</span>
@@ -111,7 +113,6 @@ export default function AdmissionDetailModal({ admission, onClose, onUpdate }) {
 
           <h2 style={styles.title}>📋 আবেদন বিস্তারিত</h2>
 
-          {/* ✅ PDF ডাউনলোড বাটন */}
           <div style={styles.pdfButtons}>
             <button onClick={() => downloadPDF(true)} disabled={loading} style={styles.pdfBtn}>
               📄 ছবি সহ PDF ডাউনলোড
@@ -121,7 +122,6 @@ export default function AdmissionDetailModal({ admission, onClose, onUpdate }) {
             </button>
           </div>
 
-          {/* ✅ PDF কন্টেন্ট (হিডেন) */}
           <div id="pdf-content" style={styles.pdfContent}>
             <div style={styles.pdfHeader}>
               <h2 style={styles.pdfTitle}>চিলমারী প্রি ক্যাডেট মাদ্রাসা</h2>
@@ -140,7 +140,6 @@ export default function AdmissionDetailModal({ admission, onClose, onUpdate }) {
             </div>
           </div>
 
-          {/* ✅ ইনফরমেশন */}
           <div style={styles.content}>
             <div style={styles.row}><span style={styles.label}>👤 ছাত্রের নাম</span><span style={styles.value}>{admission.student_name}</span></div>
             <div style={styles.row}><span style={styles.label}>📚 ক্লাস</span><span style={styles.value}>{admission.class_to_admit || '—'}</span></div>
@@ -161,7 +160,6 @@ export default function AdmissionDetailModal({ admission, onClose, onUpdate }) {
             </div>
           </div>
 
-          {/* ✅ ডকুমেন্ট গ্যালারি */}
           {images.length > 0 && (
             <div style={styles.gallerySection}>
               <h4 style={styles.galleryTitle}>📎 আপলোড করা ডকুমেন্ট</h4>
@@ -183,7 +181,6 @@ export default function AdmissionDetailModal({ admission, onClose, onUpdate }) {
             </div>
           )}
 
-          {/* ✅ অ্যাকশন বাটন */}
           {admission.status === 'pending' && (
             <div style={styles.actionRow}>
               <button onClick={() => handleStatusUpdate('approved')} disabled={loading} style={styles.approveBtn}>
@@ -197,7 +194,6 @@ export default function AdmissionDetailModal({ admission, onClose, onUpdate }) {
         </div>
       </div>
 
-      {/* ✅ ইমেজ ভিউয়ার */}
       {imageViewerOpen && currentImage && (
         <div style={styles.viewerOverlay} onClick={closeImageViewer}>
           <div style={styles.viewerModal} onClick={(e) => e.stopPropagation()}>
