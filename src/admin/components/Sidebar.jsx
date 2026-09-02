@@ -12,9 +12,10 @@ const getMenuItems = (role, hasPermission) => {
     { path: '/', icon: '📊', label: 'ড্যাশবোর্ড', permission: 'view_dashboard' },
   ];
 
-  // শুধু সুপার অ্যাডমিন ও অ্যাডমিন দেখতে পারে
+  // অ্যাডমিন ও সুপার অ্যাডমিন দেখতে পারে
   const adminMenus = [
     { path: '/homepage', icon: '🏠', label: 'হোমপেজ', permission: 'edit_homepage' },
+    { path: '/admissions', icon: '📝', label: 'অনলাইন আবেদন ফরম', permission: 'manage_admissions' },
     { path: '/teachers', icon: '👨‍🏫', label: 'শিক্ষক', permission: 'manage_teachers' },
     { path: '/students', icon: '🎓', label: 'ছাত্র', permission: 'manage_students' },
     { path: '/notices', icon: '📢', label: 'নোটিশ', permission: 'manage_notices' },
