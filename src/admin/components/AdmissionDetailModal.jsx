@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '../../supabaseClient';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
@@ -8,16 +8,25 @@ export default function AdmissionDetailModal({ admission, onClose, onUpdate }) {
   const [imageViewerOpen, setImageViewerOpen] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [slideIndex, setSlideIndex] = useState(0);
+  const [error, setError] = useState('');
 
-  // ✅ ইমেজ লিস্ট
+  // ✅ ডেটা ভ্যালিডেশন
+  useEffect(() => {
+    if (!admission) {
+      setError('❌ আবেদনের ডেটা পাওয়া যায়নি');
+    }
+  }, [admission]);
+
+  // ✅ ইমেজ লিস্ট (ভ্যালিডেশন সহ)
   const images = [];
-  if (admission.student_photo) images.push({ url: admission.student_photo, label: 'ছাত্র/ছাত্রীর ছবি' });
-  if (admission.birth_cert_photo) images.push({ url: admission.birth_cert_photo, label: 'জন্ম নিবন্ধন' });
-  if (admission.father_nid_photo) images.push({ url: admission.father_nid_photo, label: 'বাবার NID' });
+  if (admission?.student_photo) images.push({ url: admission.student_photo, label: 'ছাত্র/ছাত্রীর ছবি' });
+  if (admission?.birth_cert_photo) images.push({ url: admission.birth_cert_photo, label: 'জন্ম নিবন্ধন' });
+  if (admission?.father_nid_photo) images.push({ url: admission.father_nid_photo, label: 'বাবার NID' });
 
   // ✅ স্ট্যাটাস আপডেট
   const handleStatusUpdate = async (newStatus) => {
     setLoading(true);
+    setError('');
     try {
       const { error } = await supabase
         .from('admissions')
@@ -29,22 +38,22 @@ export default function AdmissionDetailModal({ admission, onClose, onUpdate }) {
       onClose();
     } catch (error) {
       console.error('Update error:', error);
-      alert('❌ স্ট্যাটাস আপডেট করতে সমস্যা');
+      setError('❌ স্ট্যাটাস আপডেট করতে সমস্যা');
     }
     setLoading(false);
   };
 
-  // ✅ PDF ডাউনলোড (সঠিক পদ্ধতি)
+  // ✅ PDF ডাউনলোড
   const downloadPDF = async (includeImages = true) => {
     setLoading(true);
+    setError('');
     try {
-      // ১. PDF কন্টেন্ট এলিমেন্ট খুঁজুন
       const content = document.getElementById('pdf-content');
       if (!content) {
         throw new Error('PDF কন্টেন্ট পাওয়া যায়নি');
       }
 
-      // ২. এলিমেন্টটি অস্থায়ীভাবে দৃশ্যমান করুন (অফ-স্ক্রিন)
+      // এলিমেন্ট অফ-স্ক্রিনে ভিজিবল করুন
       const originalDisplay = content.style.display;
       content.style.display = 'block';
       content.style.position = 'absolute';
@@ -54,7 +63,6 @@ export default function AdmissionDetailModal({ admission, onClose, onUpdate }) {
       content.style.background = 'white';
       content.style.padding = '20px';
 
-      // ৩. html2canvas দিয়ে ক্যাপচার করুন
       const canvas = await html2canvas(content, {
         scale: 2,
         useCORS: true,
@@ -65,7 +73,6 @@ export default function AdmissionDetailModal({ admission, onClose, onUpdate }) {
         height: content.scrollHeight,
       });
 
-      // ৪. এলিমেন্টটি আবার লুকান
       content.style.display = originalDisplay || 'none';
       content.style.position = '';
       content.style.left = '';
@@ -74,7 +81,6 @@ export default function AdmissionDetailModal({ admission, onClose, onUpdate }) {
       content.style.background = '';
       content.style.padding = '';
 
-      // ৫. PDF তৈরি করুন
       const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF('p', 'mm', 'a4');
       const pdfWidth = pdf.internal.pageSize.getWidth();
@@ -84,7 +90,7 @@ export default function AdmissionDetailModal({ admission, onClose, onUpdate }) {
       pdf.save(`আবেদন_ফরম_${admission.form_number || 'NA'}.pdf`);
     } catch (error) {
       console.error('PDF download error:', error);
-      alert(`❌ PDF ডাউনলোড করতে সমস্যা: ${error.message}`);
+      setError(`❌ PDF ডাউনলোড করতে সমস্যা: ${error.message}`);
     }
     setLoading(false);
   };
@@ -101,7 +107,7 @@ export default function AdmissionDetailModal({ admission, onClose, onUpdate }) {
       URL.revokeObjectURL(link.href);
     } catch (error) {
       console.error('Download error:', error);
-      alert('❌ ছবি ডাউনলোড করতে সমস্যা');
+      setError('❌ ছবি ডাউনলোড করতে সমস্যা');
     }
   };
 
@@ -123,11 +129,38 @@ export default function AdmissionDetailModal({ admission, onClose, onUpdate }) {
 
   const currentImage = images[slideIndex];
 
+  // ✅ যদি ডেটা না থাকে
+  if (!admission) {
+    return (
+      <div style={styles.overlay} onClick={onClose}>
+        <div style={styles.modal}>
+          <button onClick={onClose} style={styles.closeBtn}>✕</button>
+          <div style={{ textAlign: 'center', padding: '40px 0' }}>
+            <span style={{ fontSize: '48px' }}>⚠️</span>
+            <p style={{ fontSize: '18px', color: '#dc2626', marginTop: '12px' }}>
+              আবেদনের ডেটা পাওয়া যায়নি
+            </p>
+            <button onClick={onClose} style={styles.approveBtn}>বন্ধ করুন</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <>
       <div style={styles.overlay} onClick={onClose}>
         <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
           <button onClick={onClose} style={styles.closeBtn}>✕</button>
+
+          {/* ✅ এরর মেসেজ */}
+          {error && (
+            <div style={styles.errorBox}>
+              <span>⚠️</span>
+              <span>{error}</span>
+              <button onClick={() => setError('')} style={styles.errorClose}>✕</button>
+            </div>
+          )}
 
           <div style={styles.formNumberHeader}>
             <span style={styles.formNumberLabel}>📋 ফরম নাম্বার</span>
@@ -145,7 +178,6 @@ export default function AdmissionDetailModal({ admission, onClose, onUpdate }) {
             </button>
           </div>
 
-          {/* ✅ PDF কন্টেন্ট (অফ-স্ক্রিন) */}
           <div id="pdf-content" style={styles.pdfContent}>
             <div style={styles.pdfHeader}>
               <h2 style={styles.pdfTitle}>চিলমারী প্রি ক্যাডেট মাদ্রাসা</h2>
@@ -161,12 +193,6 @@ export default function AdmissionDetailModal({ admission, onClose, onUpdate }) {
               <div style={styles.pdfRow}><strong>ইমেইল:</strong> {admission.email || '—'}</div>
               <div style={styles.pdfRow}><strong>স্ট্যাটাস:</strong> {admission.status}</div>
               <div style={styles.pdfRow}><strong>আবেদনের তারিখ:</strong> {new Date(admission.created_at).toLocaleString('bn-BD')}</div>
-              {includeImages && images.map((img, idx) => (
-                <div key={idx} style={styles.pdfRow}>
-                  <strong>{img.label}:</strong> 
-                  <img src={img.url} alt={img.label} style={{ maxWidth: '100%', height: 'auto', maxHeight: '150px', marginTop: '4px' }} />
-                </div>
-              ))}
             </div>
           </div>
 
@@ -196,7 +222,14 @@ export default function AdmissionDetailModal({ admission, onClose, onUpdate }) {
               <div style={styles.galleryGrid}>
                 {images.map((img, idx) => (
                   <div key={idx} style={styles.galleryItem} onClick={() => openImageViewer(idx)}>
-                    <img src={img.url} alt={img.label} style={styles.galleryThumb} />
+                    <img
+                      src={img.url}
+                      alt={img.label}
+                      style={styles.galleryThumb}
+                      onError={(e) => {
+                        e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100"%3E%3Crect width="100" height="100" fill="%23f1f5f9"/%3E%3Ctext x="50" y="55" text-anchor="middle" font-size="12" fill="%2394a3b8"%3E🖼️%3C/text%3E%3C/svg%3E';
+                      }}
+                    />
                     <span style={styles.galleryLabel}>{img.label}</span>
                     <button
                       onClick={(e) => { e.stopPropagation(); downloadImage(img.url, img.label); }}
@@ -243,6 +276,9 @@ export default function AdmissionDetailModal({ admission, onClose, onUpdate }) {
                   transform: `scale(${zoom})`,
                   transition: 'transform 0.2s ease',
                 }}
+                onError={(e) => {
+                  e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="400"%3E%3Crect width="400" height="400" fill="%231e293b"/%3E%3Ctext x="200" y="220" text-anchor="middle" font-size="40" fill="%2364748b"%3E🖼️%3C/text%3E%3C/svg%3E';
+                }}
               />
             </div>
             {images.length > 1 && (
@@ -277,6 +313,16 @@ const styles = {
     width: '36px', height: '36px', borderRadius: '50%',
     fontSize: '18px', cursor: 'pointer',
   },
+  errorBox: {
+    background: '#fee2e2', color: '#991b1b',
+    padding: '10px 14px', borderRadius: '10px',
+    display: 'flex', alignItems: 'center', gap: '10px',
+    marginBottom: '12px', borderLeft: '4px solid #dc2626',
+  },
+  errorClose: {
+    background: 'none', border: 'none', fontSize: '16px',
+    cursor: 'pointer', color: '#991b1b', marginLeft: 'auto',
+  },
   formNumberHeader: {
     background: 'linear-gradient(135deg, #14532d, #16a34a)',
     borderRadius: '12px', padding: '12px 16px',
@@ -303,7 +349,7 @@ const styles = {
     fontSize: '13px', flex: 1, minWidth: '130px',
   },
   pdfContent: {
-    display: 'none', // হিডেন কিন্তু অফ-স্ক্রিনে দেখানো হবে
+    display: 'none',
     position: 'absolute',
     left: '-9999px',
     top: 0,
