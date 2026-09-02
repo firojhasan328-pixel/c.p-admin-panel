@@ -94,19 +94,19 @@ export default function AdmissionDashboard() {
   };
 
   // =============================================
-  // ✅ ডিলিট (রিসাইকেল বিনে) — সম্পূর্ণ আপডেটেড
+  // ✅ ডিলিট (রিসাইকেল বিনে) — সম্পূর্ণ এরর-ফ্রী
   // =============================================
   const deleteAdmission = async (admission) => {
     if (!confirm(`"${admission.student_name}"-এর আবেদনটি রিসাইকেল বিনে সরাতে চান?`)) return;
 
     setActionLoading(true);
     try {
-      // ১. রিসাইকেল বিনে যোগ করুন
+      // ✅ সরাসরি JSON স্ট্রিং হিসেবে পাঠানো হচ্ছে (UUID error এড়াতে)
       const recycleData = {
         original_table: 'admissions',
         original_id: admission.id,
-        data: admission,
-        deleted_by: 'admin',
+        data: JSON.stringify(admission),
+        deleted_by: null,
         deleted_at: new Date().toISOString(),
       };
 
@@ -118,28 +118,10 @@ export default function AdmissionDashboard() {
 
       if (recycleError) {
         console.error('❌ Recycle insert error:', recycleError);
-        
-        // ✅ যদি recycle_bin টেবিলে data কলাম JSONB না হয়, তাহলে আলাদা ফরম্যাটে পাঠান
-        if (recycleError.message.includes('JSON')) {
-          const fallbackData = {
-            original_table: 'admissions',
-            original_id: admission.id,
-            data: JSON.stringify(admission),
-            deleted_by: 'admin',
-            deleted_at: new Date().toISOString(),
-          };
-          
-          const { error: fallbackError } = await supabase
-            .from('recycle_bin')
-            .insert([fallbackData]);
-            
-          if (fallbackError) throw new Error(fallbackError.message);
-        } else {
-          throw new Error(recycleError.message);
-        }
+        throw new Error(recycleError.message);
       }
 
-      // ২. admissions টেবিল থেকে ডিলিট করুন
+      // ✅ admissions টেবিল থেকে ডিলিট
       const { error: deleteError } = await supabase
         .from('admissions')
         .delete()
@@ -295,7 +277,6 @@ export default function AdmissionDashboard() {
                       {new Date(ad.created_at).toLocaleDateString('bn-BD')}
                     </td>
                     <td style={styles.td}>
-                      {/* ✅ ডিটেইলস বাটন */}
                       <button
                         onClick={() => {
                           setSelectedAdmission(ad);
@@ -307,7 +288,6 @@ export default function AdmissionDashboard() {
                         📋
                       </button>
 
-                      {/* ✅ স্ট্যাটাস বাটন (pending থাকলে) */}
                       {ad.status === 'pending' && (
                         <div style={styles.actionButtons}>
                           <button
@@ -329,7 +309,6 @@ export default function AdmissionDashboard() {
                         </div>
                       )}
 
-                      {/* ✅ রিভার্স অ্যাকশন (অনুমোদিত/বাতিল থাকলে) */}
                       {ad.status !== 'pending' && (
                         <button
                           onClick={() => toggleStatus(ad.id, ad.status)}
@@ -341,7 +320,6 @@ export default function AdmissionDashboard() {
                         </button>
                       )}
 
-                      {/* ✅ ডিলিট বাটন */}
                       <button
                         onClick={() => deleteAdmission(ad)}
                         disabled={actionLoading}
@@ -359,7 +337,6 @@ export default function AdmissionDashboard() {
         </div>
       )}
 
-      {/* ✅ মোডাল */}
       {modalOpen && selectedAdmission && (
         <AdmissionDetailModal
           admission={selectedAdmission}
