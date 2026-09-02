@@ -3,6 +3,7 @@ import { supabase } from '../../supabaseClient';
 
 export default function FooterManager() {
   const [footerData, setFooterData] = useState({
+    title: 'চিলমারী প্রি ক্যাডেট মাদ্রাসা',
     copyright: '© 2026 চিলমারী প্রি ক্যাডেট মাদ্রাসা। সর্বস্বত্ব সংরক্ষিত।',
     address: 'চিলমারী, কুড়িগ্রাম, বাংলাদেশ',
     phone: '+8801521-553003',
@@ -30,9 +31,6 @@ export default function FooterManager() {
   const [urlUploading, setUrlUploading] = useState(false);
   const fileInputRef = useRef(null);
 
-  // =============================================
-  // ✅ ডেটা লোড
-  // =============================================
   useEffect(() => {
     loadFooterData();
   }, []);
@@ -49,6 +47,7 @@ export default function FooterManager() {
           )
         `)
         .in('cms_fields.field_key', [
+          'footer_title',
           'footer_copyright', 'footer_address', 'footer_phone', 'footer_email',
           'footer_dev_image', 'footer_dev_name', 'footer_dev_tagline', 'footer_dev_subtitle',
           'footer_whatsapp', 'footer_facebook', 'footer_call',
@@ -65,6 +64,7 @@ export default function FooterManager() {
           }
         });
         setFooterData({
+          title: formatted.footer_title || 'চিলমারী প্রি ক্যাডেট মাদ্রাসা',
           copyright: formatted.footer_copyright || '© 2026 চিলমারী প্রি ক্যাডেট মাদ্রাসা। সর্বস্বত্ব সংরক্ষিত।',
           address: formatted.footer_address || 'চিলমারী, কুড়িগ্রাম, বাংলাদেশ',
           phone: formatted.footer_phone || '+8801521-553003',
@@ -88,9 +88,6 @@ export default function FooterManager() {
     setLoading(false);
   };
 
-  // =============================================
-  // ✅ ফিল্ড আপডেট
-  // =============================================
   const updateField = async (fieldKey, value) => {
     setSaving(true);
     try {
@@ -138,9 +135,6 @@ export default function FooterManager() {
     setEditingField(null);
   };
 
-  // =============================================
-  // ✅ ইমেজ আপলোড (ফাইল)
-  // =============================================
   const handleImageUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -179,9 +173,6 @@ export default function FooterManager() {
     e.target.value = '';
   };
 
-  // =============================================
-  // ✅ URL ইমেজ আপলোড
-  // =============================================
   const handleUrlImageUpload = async () => {
     if (!urlInput) {
       setErrorMessage('⚠️ দয়া করে একটি URL দিন');
@@ -209,9 +200,6 @@ export default function FooterManager() {
     setUrlUploading(false);
   };
 
-  // =============================================
-  // ✅ এডিট কন্ট্রোল
-  // =============================================
   const startEdit = (fieldKey, value) => {
     setEditingField(fieldKey);
     setEditValue(value);
@@ -230,9 +218,6 @@ export default function FooterManager() {
     updateField(fieldKey, editValue);
   };
 
-  // =============================================
-  // ✅ রেন্ডার
-  // =============================================
   if (loading) {
     return (
       <div style={{ textAlign: 'center', padding: '60px 0' }}>
@@ -240,13 +225,6 @@ export default function FooterManager() {
       </div>
     );
   }
-
-  // ফিল্ড গুলো গ্রুপ করুন
-  const fields = {
-    info: ['copyright', 'address', 'phone', 'email'],
-    dev: ['dev_image', 'dev_subtitle', 'dev_name', 'dev_tagline'],
-    social: ['whatsapp', 'facebook', 'call', 'whatsapp_label', 'facebook_label', 'call_label'],
-  };
 
   return (
     <div style={styles.container}>
@@ -272,20 +250,98 @@ export default function FooterManager() {
       <div style={styles.previewSection}>
         <h3 style={styles.previewTitle}>📌 ফুটার প্রিভিউ (লাইভ)</h3>
 
-        {/* =============================================
-            📌 ফুটার কার্ড (হোমপেজের মতো)
-            ============================================= */}
         <div style={styles.footerPreview}>
           <div style={styles.footerTop}>
-            <div style={styles.footerInfo}>
-              <h4 style={styles.footerTitle}>চিলমারী প্রি ক্যাডেট মাদ্রাসা</h4>
-              <p style={styles.footerText}>📍 {footerData.address}</p>
-              <p style={styles.footerText}>📞 {footerData.phone}</p>
-              <p style={styles.footerText}>✉️ {footerData.email}</p>
+            {/* ✅ ফুটার শিরোনাম (এডিটেবল) */}
+            <div style={styles.fieldRow}>
+              {editingField === 'footer_title' ? (
+                <div style={styles.editContainer}>
+                  <input
+                    type="text"
+                    value={editValue}
+                    onChange={handleEditChange}
+                    style={styles.editInput}
+                    autoFocus
+                  />
+                  <button onClick={() => handleEditSubmit('footer_title')} style={styles.editSaveBtn}>💾</button>
+                  <button onClick={() => setEditingField(null)} style={styles.editCancelBtn}>✕</button>
+                </div>
+              ) : (
+                <div style={styles.fieldDisplay}>
+                  <h4 style={styles.footerTitle}>{footerData.title}</h4>
+                  <button onClick={() => startEdit('footer_title', footerData.title)} style={styles.editIconBtn}>✏️</button>
+                </div>
+              )}
+            </div>
+
+            {/* ✅ ঠিকানা */}
+            <div style={styles.fieldRow}>
+              {editingField === 'footer_address' ? (
+                <div style={styles.editContainer}>
+                  <input
+                    type="text"
+                    value={editValue}
+                    onChange={handleEditChange}
+                    style={styles.editInput}
+                    autoFocus
+                  />
+                  <button onClick={() => handleEditSubmit('footer_address')} style={styles.editSaveBtn}>💾</button>
+                  <button onClick={() => setEditingField(null)} style={styles.editCancelBtn}>✕</button>
+                </div>
+              ) : (
+                <div style={styles.fieldDisplay}>
+                  <p style={styles.footerText}>📍 {footerData.address}</p>
+                  <button onClick={() => startEdit('footer_address', footerData.address)} style={styles.editIconBtn}>✏️</button>
+                </div>
+              )}
+            </div>
+
+            {/* ✅ ফোন */}
+            <div style={styles.fieldRow}>
+              {editingField === 'footer_phone' ? (
+                <div style={styles.editContainer}>
+                  <input
+                    type="text"
+                    value={editValue}
+                    onChange={handleEditChange}
+                    style={styles.editInput}
+                    autoFocus
+                  />
+                  <button onClick={() => handleEditSubmit('footer_phone')} style={styles.editSaveBtn}>💾</button>
+                  <button onClick={() => setEditingField(null)} style={styles.editCancelBtn}>✕</button>
+                </div>
+              ) : (
+                <div style={styles.fieldDisplay}>
+                  <p style={styles.footerText}>📞 {footerData.phone}</p>
+                  <button onClick={() => startEdit('footer_phone', footerData.phone)} style={styles.editIconBtn}>✏️</button>
+                </div>
+              )}
+            </div>
+
+            {/* ✅ ইমেইল */}
+            <div style={styles.fieldRow}>
+              {editingField === 'footer_email' ? (
+                <div style={styles.editContainer}>
+                  <input
+                    type="text"
+                    value={editValue}
+                    onChange={handleEditChange}
+                    style={styles.editInput}
+                    autoFocus
+                  />
+                  <button onClick={() => handleEditSubmit('footer_email')} style={styles.editSaveBtn}>💾</button>
+                  <button onClick={() => setEditingField(null)} style={styles.editCancelBtn}>✕</button>
+                </div>
+              ) : (
+                <div style={styles.fieldDisplay}>
+                  <p style={styles.footerText}>✉️ {footerData.email}</p>
+                  <button onClick={() => startEdit('footer_email', footerData.email)} style={styles.editIconBtn}>✏️</button>
+                </div>
+              )}
             </div>
           </div>
 
-          {/* ✅ ডেভেলপার কার্ড */}
+          {/* ✅ ডেভেলপার কার্ড - আগের মতোই থাকবে */}
           <div style={styles.devCard}>
             <div style={styles.devImageWrapper}>
               <img src={footerData.dev_image} alt="Developer" style={styles.devImage} />
@@ -388,9 +444,8 @@ export default function FooterManager() {
               </div>
             </div>
 
-            {/* ✅ সোশ্যাল বাটন */}
+            {/* ✅ সোশ্যাল বাটন - আগের মতোই থাকবে */}
             <div style={styles.socialButtons}>
-              {/* WhatsApp */}
               <div style={styles.socialRow}>
                 {editingField === 'footer_whatsapp' ? (
                   <div style={styles.editContainer}>
@@ -430,7 +485,6 @@ export default function FooterManager() {
                 )}
               </div>
 
-              {/* Facebook */}
               <div style={styles.socialRow}>
                 {editingField === 'footer_facebook' ? (
                   <div style={styles.editContainer}>
@@ -470,7 +524,6 @@ export default function FooterManager() {
                 )}
               </div>
 
-              {/* Call */}
               <div style={styles.socialRow}>
                 {editingField === 'footer_call' ? (
                   <div style={styles.editContainer}>
@@ -539,9 +592,6 @@ export default function FooterManager() {
   );
 }
 
-// =============================================
-// 🎨 প্রিমিয়াম স্টাইল
-// =============================================
 const styles = {
   container: { maxWidth: '900px', margin: '0 auto', padding: '0 16px', fontFamily: "'Hind Siliguri', sans-serif" },
   title: { fontSize: '24px', fontWeight: '700', color: '#0f172a', margin: '0 0 4px 0' },
@@ -578,6 +628,20 @@ const styles = {
   footerTop: { textAlign: 'center', marginBottom: '24px', borderBottom: '1px solid #1e293b', paddingBottom: '20px' },
   footerTitle: { color: '#ffffff', fontSize: '20px', fontWeight: '700', margin: '0 0 8px 0' },
   footerText: { fontSize: '14px', margin: '4px 0', color: '#cbd5e1' },
+  fieldRow: { marginBottom: '8px', padding: '4px 0' },
+  fieldDisplay: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', flexWrap: 'wrap' },
+  editIconBtn: { background: '#f1f5f9', border: 'none', padding: '4px 10px', borderRadius: '6px', cursor: 'pointer', fontSize: '14px' },
+  editIconBtnSmall: { background: '#f1f5f9', border: 'none', padding: '2px 8px', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' },
+  editLabelBtn: { background: 'none', border: 'none', color: '#3b82f6', fontSize: '11px', cursor: 'pointer', textDecoration: 'underline' },
+  editContainer: { display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center' },
+  editContainerInline: { display: 'flex', gap: '4px', alignItems: 'center' },
+  editInput: { padding: '6px 12px', borderRadius: '8px', border: '2px solid #16a34a', fontSize: '14px', outline: 'none', minWidth: '200px' },
+  editInputSmall: { padding: '4px 10px', borderRadius: '8px', border: '2px solid #16a34a', fontSize: '13px', outline: 'none', minWidth: '150px' },
+  editInputTiny: { padding: '2px 8px', borderRadius: '6px', border: '2px solid #16a34a', fontSize: '12px', outline: 'none', width: '80px' },
+  editSaveBtn: { background: '#16a34a', color: 'white', border: 'none', padding: '6px 14px', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' },
+  editSaveBtnSmall: { background: '#16a34a', color: 'white', border: 'none', padding: '2px 10px', borderRadius: '6px', fontWeight: '600', cursor: 'pointer', fontSize: '12px' },
+  editCancelBtn: { background: '#64748b', color: 'white', border: 'none', padding: '6px 14px', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' },
+  editCancelBtnSmall: { background: '#64748b', color: 'white', border: 'none', padding: '2px 10px', borderRadius: '6px', fontWeight: '600', cursor: 'pointer', fontSize: '12px' },
   devCard: {
     background: 'linear-gradient(145deg, #1e293b, #0f172a)',
     border: '1px solid #334155', borderRadius: '20px',
@@ -597,23 +661,9 @@ const styles = {
   urlInput: { flex: 1, padding: '6px 10px', borderRadius: '8px', border: '1.5px solid #e2e8f0', fontSize: '13px', outline: 'none' },
   urlBtn: { background: '#3b82f6', color: 'white', border: 'none', padding: '6px 14px', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' },
   devInfo: { marginTop: '8px' },
-  fieldRow: { marginBottom: '8px', padding: '4px 0' },
-  fieldDisplay: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', flexWrap: 'wrap' },
   devSubtitle: { fontSize: '14px', color: '#94a3b8' },
   devName: { fontSize: '20px', fontWeight: '800', background: 'linear-gradient(135deg, #38bdf8, #34d399)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', margin: '4px 0' },
   devTagline: { fontSize: '14px', color: '#e0f2fe', fontWeight: '600' },
-  editIconBtn: { background: '#f1f5f9', border: 'none', padding: '4px 10px', borderRadius: '6px', cursor: 'pointer', fontSize: '14px' },
-  editIconBtnSmall: { background: '#f1f5f9', border: 'none', padding: '2px 8px', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' },
-  editLabelBtn: { background: 'none', border: 'none', color: '#3b82f6', fontSize: '11px', cursor: 'pointer', textDecoration: 'underline' },
-  editContainer: { display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center' },
-  editContainerInline: { display: 'flex', gap: '4px', alignItems: 'center' },
-  editInput: { padding: '6px 12px', borderRadius: '8px', border: '2px solid #16a34a', fontSize: '14px', outline: 'none', minWidth: '200px' },
-  editInputSmall: { padding: '4px 10px', borderRadius: '8px', border: '2px solid #16a34a', fontSize: '13px', outline: 'none', minWidth: '150px' },
-  editInputTiny: { padding: '2px 8px', borderRadius: '6px', border: '2px solid #16a34a', fontSize: '12px', outline: 'none', width: '80px' },
-  editSaveBtn: { background: '#16a34a', color: 'white', border: 'none', padding: '6px 14px', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' },
-  editSaveBtnSmall: { background: '#16a34a', color: 'white', border: 'none', padding: '2px 10px', borderRadius: '6px', fontWeight: '600', cursor: 'pointer', fontSize: '12px' },
-  editCancelBtn: { background: '#64748b', color: 'white', border: 'none', padding: '6px 14px', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' },
-  editCancelBtnSmall: { background: '#64748b', color: 'white', border: 'none', padding: '2px 10px', borderRadius: '6px', fontWeight: '600', cursor: 'pointer', fontSize: '12px' },
   socialButtons: { display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '12px', alignItems: 'center' },
   socialRow: { width: '100%', maxWidth: '400px' },
   socialDisplay: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', flexWrap: 'wrap', background: 'rgba(255,255,255,0.05)', padding: '6px 12px', borderRadius: '8px' },
