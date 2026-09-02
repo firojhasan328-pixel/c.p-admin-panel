@@ -30,7 +30,6 @@ export default function AdmissionDashboard() {
       if (error) throw error;
       setAdmissions(data || []);
 
-      // স্ট্যাটিস্টিক্স ক্যালকুলেট
       const total = data?.length || 0;
       const approved = data?.filter(a => a.status === 'approved').length || 0;
       const rejected = data?.filter(a => a.status === 'rejected').length || 0;
@@ -43,7 +42,7 @@ export default function AdmissionDashboard() {
   };
 
   // =============================================
-  // ✅ স্ট্যাটাস আপডেট (অনুমোদন/বাতিল)
+  // ✅ স্ট্যাটাস আপডেট
   // =============================================
   const updateStatus = async (id, newStatus) => {
     setActionLoading(true);
@@ -54,11 +53,7 @@ export default function AdmissionDashboard() {
         .eq('id', id);
 
       if (error) throw error;
-
-      // ✅ ডেটা রিলোড
       await fetchAdmissions();
-      
-      // ✅ সফল মেসেজ
       alert(`✅ আবেদন ${newStatus === 'approved' ? 'অনুমোদন' : 'বাতিল'} করা হয়েছে!`);
     } catch (error) {
       console.error('Update error:', error);
@@ -68,16 +63,14 @@ export default function AdmissionDashboard() {
   };
 
   // =============================================
-  // ✅ ফিল্টার করা ডেটা
+  // ✅ ফিল্টার
   // =============================================
   const filteredData = admissions.filter(ad => {
     const matchesSearch = 
       ad.student_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       ad.phone?.includes(searchTerm) ||
       ad.email?.toLowerCase().includes(searchTerm.toLowerCase());
-    
     const matchesFilter = filterStatus === 'all' || ad.status === filterStatus;
-    
     return matchesSearch && matchesFilter;
   });
 
@@ -101,9 +94,7 @@ export default function AdmissionDashboard() {
       <h2 style={styles.title}>📝 অনলাইন আবেদন ফরম</h2>
       <p style={styles.subtitle}>ছাত্র/ছাত্রীদের ভর্তি আবেদন এখানে দেখুন ও ব্যবস্থাপনা করুন</p>
 
-      {/* =============================================
-          📊 স্ট্যাটিস্টিক্স কার্ড
-          ============================================= */}
+      {/* ✅ স্ট্যাটিস্টিক্স কার্ড */}
       <div style={styles.statsGrid}>
         <div style={{ ...styles.statCard, background: 'linear-gradient(135deg, #3b82f6, #2563eb)' }}>
           <div style={styles.statIcon}>📋</div>
@@ -135,13 +126,11 @@ export default function AdmissionDashboard() {
         </div>
       </div>
 
-      {/* =============================================
-          🔍 ফিল্টার ও সার্চ
-          ============================================= */}
+      {/* ✅ ফিল্টার ও সার্চ */}
       <div style={styles.filterBar}>
         <input
           type="text"
-          placeholder="🔍 নাম, ফোন বা ইমেইল দিয়ে খুঁজুন..."
+          placeholder="🔍 নাম, ফোন বা ইমেইল..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           style={styles.searchInput}
@@ -159,9 +148,7 @@ export default function AdmissionDashboard() {
         <button onClick={fetchAdmissions} style={styles.refreshBtn}>🔄 রিফ্রেশ</button>
       </div>
 
-      {/* =============================================
-          📋 আবেদন টেবিল
-          ============================================= */}
+      {/* ✅ টেবিল */}
       {loading ? (
         <div style={styles.loading}>⏳ লোড হচ্ছে...</div>
       ) : filteredData.length === 0 ? (
@@ -175,10 +162,9 @@ export default function AdmissionDashboard() {
             <thead>
               <tr>
                 <th style={styles.th}>#</th>
-                <th style={styles.th}>ছাত্রের নাম</th>
+                <th style={styles.th}>নাম</th>
                 <th style={styles.th}>ক্লাস</th>
                 <th style={styles.th}>ফোন</th>
-                <th style={styles.th}>ইমেইল</th>
                 <th style={styles.th}>স্ট্যাটাস</th>
                 <th style={styles.th}>তারিখ</th>
                 <th style={styles.th}>অ্যাকশন</th>
@@ -203,7 +189,6 @@ export default function AdmissionDashboard() {
                     </td>
                     <td style={styles.td}>{ad.class_to_admit || '—'}</td>
                     <td style={styles.td}>{ad.phone || '—'}</td>
-                    <td style={styles.td}>{ad.email || '—'}</td>
                     <td style={styles.td}>
                       <span style={{ ...styles.badge, background: badge.background, color: badge.color }}>
                         {badge.label}
@@ -213,7 +198,7 @@ export default function AdmissionDashboard() {
                       {new Date(ad.created_at).toLocaleDateString('bn-BD')}
                     </td>
                     <td style={styles.td}>
-                      {ad.status === 'pending' && (
+                      {ad.status === 'pending' ? (
                         <div style={styles.actionButtons}>
                           <button
                             onClick={() => updateStatus(ad.id, 'approved')}
@@ -232,8 +217,7 @@ export default function AdmissionDashboard() {
                             ❌
                           </button>
                         </div>
-                      )}
-                      {ad.status !== 'pending' && (
+                      ) : (
                         <span style={styles.statusText}>
                           {ad.status === 'approved' ? '✅' : '❌'}
                         </span>
@@ -247,7 +231,6 @@ export default function AdmissionDashboard() {
         </div>
       )}
 
-      {/* ✅ আবেদন বিস্তারিত মোডাল */}
       {modalOpen && selectedAdmission && (
         <AdmissionDetailModal
           admission={selectedAdmission}
@@ -260,69 +243,168 @@ export default function AdmissionDashboard() {
 }
 
 // =============================================
-// 🎨 স্টাইল
+// 🎨 প্রিমিয়াম রেসপনসিভ স্টাইল
 // =============================================
 const styles = {
-  container: { maxWidth: '1200px', margin: '0 auto', padding: '0 16px', fontFamily: "'Hind Siliguri', sans-serif" },
-  title: { fontSize: '24px', fontWeight: '700', color: '#0f172a', margin: '0 0 4px 0' },
-  subtitle: { fontSize: '14px', color: '#64748b', margin: '0 0 24px 0' },
-  statsGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px' },
-  statCard: {
-    display: 'flex', alignItems: 'center', gap: '16px',
-    padding: '20px 24px', borderRadius: '14px', color: 'white',
-    boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+  container: {
+    maxWidth: '1200px',
+    margin: '0 auto',
+    padding: '0 16px',
+    fontFamily: "'Hind Siliguri', sans-serif",
+    width: '100%',
+    boxSizing: 'border-box',
   },
-  statIcon: { fontSize: '32px' },
-  statNumber: { fontSize: '28px', fontWeight: '800', lineHeight: 1.2 },
-  statLabel: { fontSize: '13px', opacity: 0.9 },
+  title: {
+    fontSize: 'clamp(20px, 4vw, 28px)',
+    fontWeight: '700',
+    color: '#0f172a',
+    margin: '0 0 4px 0',
+  },
+  subtitle: {
+    fontSize: 'clamp(13px, 2vw, 16px)',
+    color: '#64748b',
+    margin: '0 0 20px 0',
+  },
+  statsGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+    gap: '12px',
+    marginBottom: '20px',
+  },
+  statCard: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+    padding: '16px 18px',
+    borderRadius: '12px',
+    color: 'white',
+    boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+    minHeight: '70px',
+  },
+  statIcon: { fontSize: 'clamp(24px, 3vw, 32px)' },
+  statNumber: { fontSize: 'clamp(20px, 3vw, 28px)', fontWeight: '800', lineHeight: 1.2 },
+  statLabel: { fontSize: 'clamp(11px, 1.5vw, 14px)', opacity: 0.9 },
   filterBar: {
-    display: 'flex', gap: '12px', flexWrap: 'wrap',
-    marginBottom: '20px', padding: '16px',
-    background: 'white', borderRadius: '12px',
+    display: 'flex',
+    gap: '10px',
+    flexWrap: 'wrap',
+    marginBottom: '16px',
+    padding: '14px',
+    background: 'white',
+    borderRadius: '12px',
     border: '1px solid #e2e8f0',
   },
   searchInput: {
-    flex: 1, minWidth: '200px',
-    padding: '10px 14px', borderRadius: '10px',
-    border: '1.5px solid #e2e8f0', fontSize: '14px',
+    flex: '1 1 180px',
+    padding: '10px 14px',
+    borderRadius: '10px',
+    border: '1.5px solid #e2e8f0',
+    fontSize: '14px',
     outline: 'none',
+    minWidth: '120px',
   },
   filterSelect: {
-    padding: '10px 14px', borderRadius: '10px',
-    border: '1.5px solid #e2e8f0', fontSize: '14px',
-    outline: 'none', background: 'white',
+    padding: '10px 14px',
+    borderRadius: '10px',
+    border: '1.5px solid #e2e8f0',
+    fontSize: '14px',
+    outline: 'none',
+    background: 'white',
+    minWidth: '120px',
   },
   refreshBtn: {
-    padding: '10px 20px', borderRadius: '10px',
-    border: 'none', background: '#f1f5f9',
-    fontWeight: '600', cursor: 'pointer',
+    padding: '10px 18px',
+    borderRadius: '10px',
+    border: 'none',
+    background: '#f1f5f9',
+    fontWeight: '600',
+    cursor: 'pointer',
+    fontSize: '14px',
+    whiteSpace: 'nowrap',
   },
   loading: { textAlign: 'center', padding: '40px 0', color: '#94a3b8' },
-  emptyState: { textAlign: 'center', padding: '60px 0', color: '#94a3b8' },
+  emptyState: { textAlign: 'center', padding: '40px 0', color: '#94a3b8' },
   emptyIcon: { fontSize: '48px', display: 'block', marginBottom: '12px' },
-  tableWrapper: { overflowX: 'auto', background: 'white', borderRadius: '14px', border: '1px solid #e2e8f0' },
-  table: { width: '100%', borderCollapse: 'collapse', fontSize: '14px' },
+  tableWrapper: {
+    overflowX: 'auto',
+    background: 'white',
+    borderRadius: '12px',
+    border: '1px solid #e2e8f0',
+    WebkitOverflowScrolling: 'touch',
+  },
+  table: {
+    width: '100%',
+    borderCollapse: 'collapse',
+    fontSize: 'clamp(12px, 1.4vw, 14px)',
+    minWidth: '600px',
+  },
   th: {
-    padding: '12px 16px', textAlign: 'left',
-    background: '#f8fafc', fontWeight: '700',
-    color: '#334155', borderBottom: '2px solid #e2e8f0',
+    padding: '10px 12px',
+    textAlign: 'left',
+    background: '#f8fafc',
+    fontWeight: '700',
+    color: '#334155',
+    borderBottom: '2px solid #e2e8f0',
     whiteSpace: 'nowrap',
   },
   tr: { borderBottom: '1px solid #f1f5f9' },
-  td: { padding: '12px 16px', verticalAlign: 'middle' },
-  clickableName: {
-    color: '#2563eb', fontWeight: '600',
-    cursor: 'pointer', textDecoration: 'underline',
+  td: {
+    padding: '10px 12px',
+    verticalAlign: 'middle',
+    wordBreak: 'break-word',
   },
-  badge: { padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: '600', display: 'inline-block' },
-  actionButtons: { display: 'flex', gap: '6px' },
+  clickableName: {
+    color: '#2563eb',
+    fontWeight: '600',
+    cursor: 'pointer',
+    textDecoration: 'underline',
+  },
+  badge: {
+    padding: '3px 10px',
+    borderRadius: '16px',
+    fontSize: 'clamp(10px, 1.2vw, 12px)',
+    fontWeight: '600',
+    display: 'inline-block',
+    whiteSpace: 'nowrap',
+  },
+  actionButtons: {
+    display: 'flex',
+    gap: '6px',
+    flexWrap: 'wrap',
+  },
   approveBtn: {
-    background: '#dcfce7', border: 'none', padding: '6px 10px', borderRadius: '6px',
-    cursor: 'pointer', fontSize: '16px', transition: 'all 0.2s',
+    background: '#dcfce7',
+    border: 'none',
+    padding: '5px 10px',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    fontSize: 'clamp(14px, 1.5vw, 16px)',
+    transition: 'all 0.2s',
   },
   rejectBtn: {
-    background: '#fee2e2', border: 'none', padding: '6px 10px', borderRadius: '6px',
-    cursor: 'pointer', fontSize: '16px', transition: 'all 0.2s',
+    background: '#fee2e2',
+    border: 'none',
+    padding: '5px 10px',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    fontSize: 'clamp(14px, 1.5vw, 16px)',
+    transition: 'all 0.2s',
   },
-  statusText: { fontSize: '18px' },
+  statusText: { fontSize: 'clamp(16px, 1.8vw, 20px)' },
 };
+
+// ✅ মোবাইলের জন্য অতিরিক্ত স্টাইল (ইনলাইন)
+const mobileStyles = `
+  @media (max-width: 640px) {
+    .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+    .stat-card { padding: 12px 14px; gap: 8px; min-height: 60px; }
+    .filter-bar { flex-direction: column; gap: 8px; }
+    .search-input, .filter-select, .refresh-btn { width: 100%; }
+    .table th, .table td { padding: 8px 10px; font-size: 12px; }
+    .action-buttons { flex-direction: row; gap: 4px; }
+  }
+`;
+
+const styleSheet = document.createElement('style');
+styleSheet.textContent = mobileStyles;
+document.head.appendChild(styleSheet);
