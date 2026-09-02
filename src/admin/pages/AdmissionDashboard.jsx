@@ -38,7 +38,16 @@ export default function AdmissionDashboard() {
     setLoading(false);
   };
 
+  // =============================================
+  // ✅ স্ট্যাটাস আপডেট (অনুমোদন/রিজেক্ট)
+  // =============================================
   const updateStatus = async (id, newStatus) => {
+    const confirmMsg = newStatus === 'approved' 
+      ? '✅ এই আবেদনটি অনুমোদন করতে চান?'
+      : '❌ এই আবেদনটি বাতিল করতে চান?';
+    
+    if (!confirm(confirmMsg)) return;
+
     setActionLoading(true);
     try {
       const { error } = await supabase
@@ -56,6 +65,75 @@ export default function AdmissionDashboard() {
     setActionLoading(false);
   };
 
+  // =============================================
+  // ✅ রিভার্স অ্যাকশন (অনুমোদন↔রিজেক্ট)
+  // =============================================
+  const toggleStatus = async (id, currentStatus) => {
+    const newStatus = currentStatus === 'approved' ? 'rejected' : 'approved';
+    const confirmMsg = newStatus === 'approved'
+      ? '✅ এই আবেদনটি আবার অনুমোদন করতে চান?'
+      : '❌ এই আবেদনটি বাতিল করতে চান?';
+    
+    if (!confirm(confirmMsg)) return;
+
+    setActionLoading(true);
+    try {
+      const { error } = await supabase
+        .from('admissions')
+        .update({ status: newStatus })
+        .eq('id', id);
+
+      if (error) throw error;
+      await fetchAdmissions();
+      alert(`✅ আবেদন ${newStatus === 'approved' ? 'অনুমোদন' : 'বাতিল'} করা হয়েছে!`);
+    } catch (error) {
+      console.error('Toggle error:', error);
+      alert('❌ স্ট্যাটাস পরিবর্তন করতে সমস্যা');
+    }
+    setActionLoading(false);
+  };
+
+  // =============================================
+  // ✅ ডিলিট (রিসাইকেল বিনে)
+  // =============================================
+  const deleteAdmission = async (admission) => {
+    if (!confirm(`"${admission.student_name}"-এর আবেদনটি রিসাইকেল বিনে সরাতে চান?`)) return;
+
+    setActionLoading(true);
+    try {
+      // ১. রিসাইকেল বিনে যোগ করুন
+      const { error: recycleError } = await supabase
+        .from('recycle_bin')
+        .insert([{
+          original_table: 'admissions',
+          original_id: admission.id,
+          data: admission,
+          deleted_by: 'admin',
+          deleted_at: new Date().toISOString(),
+        }]);
+
+      if (recycleError) throw recycleError;
+
+      // ২. admissions টেবিল থেকে ডিলিট করুন
+      const { error: deleteError } = await supabase
+        .from('admissions')
+        .delete()
+        .eq('id', admission.id);
+
+      if (deleteError) throw deleteError;
+
+      await fetchAdmissions();
+      alert(`✅ "${admission.student_name}"-এর আবেদন রিসাইকেল বিনে সরানো হয়েছে!`);
+    } catch (error) {
+      console.error('Delete error:', error);
+      alert('❌ ডিলিট করতে সমস্যা');
+    }
+    setActionLoading(false);
+  };
+
+  // =============================================
+  // ✅ ফিল্টার
+  // =============================================
   const filteredData = admissions.filter(ad => {
     const matchesSearch = 
       ad.student_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -65,6 +143,9 @@ export default function AdmissionDashboard() {
     return matchesSearch && matchesFilter;
   });
 
+  // =============================================
+  // ✅ স্ট্যাটাস ব্যাজ
+  // =============================================
   const getStatusBadge = (status) => {
     const styles = {
       pending: { background: '#fef3c7', color: '#f59e0b', label: '⏳ pending' },
@@ -79,6 +160,7 @@ export default function AdmissionDashboard() {
       <h2 style={styles.title}>📝 অনলাইন আবেদন ফরম</h2>
       <p style={styles.subtitle}>ছাত্র/ছাত্রীদের ভর্তি আবেদন এখানে দেখুন ও ব্যবস্থাপনা করুন</p>
 
+      {/* ✅ স্ট্যাটিস্টিক্স কার্ড */}
       <div style={styles.statsGrid}>
         <div style={{ ...styles.statCard, background: 'linear-gradient(135deg, #3b82f6, #2563eb)' }}>
           <div style={styles.statIcon}>📋</div>
@@ -110,6 +192,7 @@ export default function AdmissionDashboard() {
         </div>
       </div>
 
+      {/* ✅ ফিল্টার বার */}
       <div style={styles.filterBar}>
         <input
           type="text"
@@ -132,6 +215,7 @@ export default function AdmissionDashboard() {
         <span style={styles.resultCount}>{filteredData.length} টি আবেদন</span>
       </div>
 
+      {/* ✅ টেবিল */}
       {loading ? (
         <div style={styles.loading}>⏳ লোড হচ্ছে...</div>
       ) : filteredData.length === 0 ? (
@@ -183,15 +267,19 @@ export default function AdmissionDashboard() {
                       {new Date(ad.created_at).toLocaleDateString('bn-BD')}
                     </td>
                     <td style={styles.td}>
+                      {/* ✅ ডিটেইলস বাটন */}
                       <button
                         onClick={() => {
                           setSelectedAdmission(ad);
                           setModalOpen(true);
                         }}
                         style={styles.detailBtn}
+                        title="বিস্তারিত দেখুন"
                       >
-                        📋 বিস্তারিত
+                        📋
                       </button>
+
+                      {/* ✅ স্ট্যাটাস বাটন (pending থাকলে) */}
                       {ad.status === 'pending' && (
                         <div style={styles.actionButtons}>
                           <button
@@ -212,11 +300,28 @@ export default function AdmissionDashboard() {
                           </button>
                         </div>
                       )}
+
+                      {/* ✅ রিভার্স অ্যাকশন (অনুমোদিত/বাতিল থাকলে) */}
                       {ad.status !== 'pending' && (
-                        <span style={styles.statusText}>
-                          {ad.status === 'approved' ? '✅' : '❌'}
-                        </span>
+                        <button
+                          onClick={() => toggleStatus(ad.id, ad.status)}
+                          disabled={actionLoading}
+                          style={ad.status === 'approved' ? styles.rejectBtn : styles.approveBtn}
+                          title={ad.status === 'approved' ? 'বাতিল করুন' : 'আবার অনুমোদন করুন'}
+                        >
+                          {ad.status === 'approved' ? '↩️' : '↪️'}
+                        </button>
                       )}
+
+                      {/* ✅ ডিলিট বাটন */}
+                      <button
+                        onClick={() => deleteAdmission(ad)}
+                        disabled={actionLoading}
+                        style={styles.deleteBtn}
+                        title="রিসাইকেল বিনে সরান"
+                      >
+                        🗑️
+                      </button>
                     </td>
                   </tr>
                 );
@@ -226,6 +331,7 @@ export default function AdmissionDashboard() {
         </div>
       )}
 
+      {/* ✅ মোডাল */}
       {modalOpen && selectedAdmission && (
         <AdmissionDetailModal
           admission={selectedAdmission}
@@ -237,6 +343,9 @@ export default function AdmissionDashboard() {
   );
 }
 
+// =============================================
+// 🎨 প্রিমিয়াম রেসপনসিভ স্টাইল
+// =============================================
 const styles = {
   container: {
     maxWidth: '1200px',
@@ -339,7 +448,7 @@ const styles = {
     width: '100%',
     borderCollapse: 'collapse',
     fontSize: 'clamp(13px, 1.4vw, 15px)',
-    minWidth: '650px',
+    minWidth: '700px',
   },
   th: {
     padding: '12px 16px',
@@ -393,13 +502,12 @@ const styles = {
     background: '#e0e7ff',
     color: '#4338ca',
     border: 'none',
-    padding: '5px 14px',
-    borderRadius: '8px',
+    padding: '5px 10px',
+    borderRadius: '6px',
     fontWeight: '600',
     cursor: 'pointer',
-    fontSize: '12px',
-    marginRight: '6px',
-    whiteSpace: 'nowrap',
+    fontSize: '14px',
+    marginRight: '4px',
     transition: 'background 0.2s',
   },
   actionButtons: {
@@ -425,10 +533,20 @@ const styles = {
     fontSize: '15px',
     transition: 'transform 0.15s',
   },
+  deleteBtn: {
+    background: '#fef2f2',
+    border: 'none',
+    padding: '5px 10px',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    fontSize: '15px',
+    transition: 'transform 0.15s',
+    color: '#dc2626',
+  },
   statusText: { fontSize: '18px' },
 };
 
-// মোবাইল রেসপনসিভ
+// ✅ মোবাইল রেসপনসিভ
 const mobileStyles = `
   @media (max-width: 640px) {
     .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
@@ -437,8 +555,8 @@ const mobileStyles = `
     .search-input, .filter-select, .refresh-btn { width: 100%; }
     .result-count { margin-left: 0; text-align: center; }
     .table th, .table td { padding: 10px 12px; font-size: 12px; }
-    .detail-btn { font-size: 11px; padding: 4px 10px; }
-    .approve-btn, .reject-btn { font-size: 13px; padding: 4px 8px; }
+    .detail-btn { font-size: 12px; padding: 4px 8px; }
+    .approve-btn, .reject-btn, .delete-btn { font-size: 13px; padding: 4px 8px; }
   }
   @media (min-width: 641px) and (max-width: 1024px) {
     .stats-grid { grid-template-columns: repeat(2, 1fr); }
