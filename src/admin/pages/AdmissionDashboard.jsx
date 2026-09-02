@@ -94,7 +94,7 @@ export default function AdmissionDashboard() {
   };
 
   // =============================================
-  // ✅ ডিলিট (রিসাইকেল বিনে)
+  // ✅ ডিলিট (রিসাইকেল বিনে) — সম্পূর্ণ আপডেটেড
   // =============================================
   const deleteAdmission = async (admission) => {
     if (!confirm(`"${admission.student_name}"-এর আবেদনটি রিসাইকেল বিনে সরাতে চান?`)) return;
@@ -102,17 +102,42 @@ export default function AdmissionDashboard() {
     setActionLoading(true);
     try {
       // ১. রিসাইকেল বিনে যোগ করুন
+      const recycleData = {
+        original_table: 'admissions',
+        original_id: admission.id,
+        data: admission,
+        deleted_by: 'admin',
+        deleted_at: new Date().toISOString(),
+      };
+
+      console.log('📦 Sending to recycle bin:', recycleData);
+
       const { error: recycleError } = await supabase
         .from('recycle_bin')
-        .insert([{
-          original_table: 'admissions',
-          original_id: admission.id,
-          data: admission,
-          deleted_by: 'admin',
-          deleted_at: new Date().toISOString(),
-        }]);
+        .insert([recycleData]);
 
-      if (recycleError) throw recycleError;
+      if (recycleError) {
+        console.error('❌ Recycle insert error:', recycleError);
+        
+        // ✅ যদি recycle_bin টেবিলে data কলাম JSONB না হয়, তাহলে আলাদা ফরম্যাটে পাঠান
+        if (recycleError.message.includes('JSON')) {
+          const fallbackData = {
+            original_table: 'admissions',
+            original_id: admission.id,
+            data: JSON.stringify(admission),
+            deleted_by: 'admin',
+            deleted_at: new Date().toISOString(),
+          };
+          
+          const { error: fallbackError } = await supabase
+            .from('recycle_bin')
+            .insert([fallbackData]);
+            
+          if (fallbackError) throw new Error(fallbackError.message);
+        } else {
+          throw new Error(recycleError.message);
+        }
+      }
 
       // ২. admissions টেবিল থেকে ডিলিট করুন
       const { error: deleteError } = await supabase
@@ -120,13 +145,16 @@ export default function AdmissionDashboard() {
         .delete()
         .eq('id', admission.id);
 
-      if (deleteError) throw deleteError;
+      if (deleteError) {
+        console.error('❌ Delete error:', deleteError);
+        throw new Error(deleteError.message);
+      }
 
       await fetchAdmissions();
       alert(`✅ "${admission.student_name}"-এর আবেদন রিসাইকেল বিনে সরানো হয়েছে!`);
     } catch (error) {
-      console.error('Delete error:', error);
-      alert('❌ ডিলিট করতে সমস্যা');
+      console.error('❌ Delete error:', error);
+      alert(`❌ ডিলিট করতে সমস্যা: ${error.message}`);
     }
     setActionLoading(false);
   };
