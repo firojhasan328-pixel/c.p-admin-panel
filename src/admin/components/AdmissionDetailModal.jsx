@@ -34,24 +34,47 @@ export default function AdmissionDetailModal({ admission, onClose, onUpdate }) {
     setLoading(false);
   };
 
-  // ✅ PDF ডাউনলোড
+  // ✅ PDF ডাউনলোড (সঠিক পদ্ধতি)
   const downloadPDF = async (includeImages = true) => {
     setLoading(true);
     try {
+      // ১. PDF কন্টেন্ট এলিমেন্ট খুঁজুন
       const content = document.getElementById('pdf-content');
       if (!content) {
-        alert('❌ PDF কন্টেন্ট পাওয়া যায়নি!');
-        setLoading(false);
-        return;
+        throw new Error('PDF কন্টেন্ট পাওয়া যায়নি');
       }
 
+      // ২. এলিমেন্টটি অস্থায়ীভাবে দৃশ্যমান করুন (অফ-স্ক্রিন)
+      const originalDisplay = content.style.display;
+      content.style.display = 'block';
+      content.style.position = 'absolute';
+      content.style.left = '-9999px';
+      content.style.top = '0';
+      content.style.width = '800px';
+      content.style.background = 'white';
+      content.style.padding = '20px';
+
+      // ৩. html2canvas দিয়ে ক্যাপচার করুন
       const canvas = await html2canvas(content, {
         scale: 2,
         useCORS: true,
         logging: false,
         backgroundColor: '#ffffff',
+        allowTaint: false,
+        width: 800,
+        height: content.scrollHeight,
       });
 
+      // ৪. এলিমেন্টটি আবার লুকান
+      content.style.display = originalDisplay || 'none';
+      content.style.position = '';
+      content.style.left = '';
+      content.style.top = '';
+      content.style.width = '';
+      content.style.background = '';
+      content.style.padding = '';
+
+      // ৫. PDF তৈরি করুন
       const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF('p', 'mm', 'a4');
       const pdfWidth = pdf.internal.pageSize.getWidth();
@@ -61,7 +84,7 @@ export default function AdmissionDetailModal({ admission, onClose, onUpdate }) {
       pdf.save(`আবেদন_ফরম_${admission.form_number || 'NA'}.pdf`);
     } catch (error) {
       console.error('PDF download error:', error);
-      alert('❌ PDF ডাউনলোড করতে সমস্যা। দয়া করে আবার চেষ্টা করুন।');
+      alert(`❌ PDF ডাউনলোড করতে সমস্যা: ${error.message}`);
     }
     setLoading(false);
   };
@@ -115,13 +138,14 @@ export default function AdmissionDetailModal({ admission, onClose, onUpdate }) {
 
           <div style={styles.pdfButtons}>
             <button onClick={() => downloadPDF(true)} disabled={loading} style={styles.pdfBtn}>
-              📄 ছবি সহ PDF ডাউনলোড
+              {loading ? '⏳ প্রস্তুত...' : '📄 ছবি সহ PDF ডাউনলোড'}
             </button>
             <button onClick={() => downloadPDF(false)} disabled={loading} style={styles.pdfBtnText}>
-              📄 শুধু ফরম PDF ডাউনলোড
+              {loading ? '⏳ প্রস্তুত...' : '📄 শুধু ফরম PDF ডাউনলোড'}
             </button>
           </div>
 
+          {/* ✅ PDF কন্টেন্ট (অফ-স্ক্রিন) */}
           <div id="pdf-content" style={styles.pdfContent}>
             <div style={styles.pdfHeader}>
               <h2 style={styles.pdfTitle}>চিলমারী প্রি ক্যাডেট মাদ্রাসা</h2>
@@ -137,6 +161,12 @@ export default function AdmissionDetailModal({ admission, onClose, onUpdate }) {
               <div style={styles.pdfRow}><strong>ইমেইল:</strong> {admission.email || '—'}</div>
               <div style={styles.pdfRow}><strong>স্ট্যাটাস:</strong> {admission.status}</div>
               <div style={styles.pdfRow}><strong>আবেদনের তারিখ:</strong> {new Date(admission.created_at).toLocaleString('bn-BD')}</div>
+              {includeImages && images.map((img, idx) => (
+                <div key={idx} style={styles.pdfRow}>
+                  <strong>{img.label}:</strong> 
+                  <img src={img.url} alt={img.label} style={{ maxWidth: '100%', height: 'auto', maxHeight: '150px', marginTop: '4px' }} />
+                </div>
+              ))}
             </div>
           </div>
 
@@ -272,7 +302,16 @@ const styles = {
     borderRadius: '8px', fontWeight: '600', cursor: 'pointer',
     fontSize: '13px', flex: 1, minWidth: '130px',
   },
-  pdfContent: { display: 'none' },
+  pdfContent: {
+    display: 'none', // হিডেন কিন্তু অফ-স্ক্রিনে দেখানো হবে
+    position: 'absolute',
+    left: '-9999px',
+    top: 0,
+    width: '800px',
+    background: 'white',
+    padding: '20px',
+    zIndex: -1,
+  },
   pdfHeader: { textAlign: 'center', marginBottom: '16px' },
   pdfTitle: { fontSize: '20px', fontWeight: '800', color: '#14532d', margin: 0 },
   pdfSubtitle: { fontSize: '14px', color: '#64748b', margin: '4px 0' },
