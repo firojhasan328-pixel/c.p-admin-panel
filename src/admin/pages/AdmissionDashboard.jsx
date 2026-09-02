@@ -101,11 +101,12 @@ export default function AdmissionDashboard() {
 
     setActionLoading(true);
     try {
-      // ✅ সরাসরি JSON স্ট্রিং হিসেবে পাঠানো হচ্ছে (UUID error এড়াতে)
+      // ✅ সব কলাম কভার করা হয়েছে
       const recycleData = {
         original_table: 'admissions',
         original_id: admission.id,
         data: JSON.stringify(admission),
+        original_data: JSON.stringify(admission), // original_data-ও পাঠানো হচ্ছে
         deleted_by: null,
         deleted_at: new Date().toISOString(),
       };
@@ -121,7 +122,6 @@ export default function AdmissionDashboard() {
         throw new Error(recycleError.message);
       }
 
-      // ✅ admissions টেবিল থেকে ডিলিট
       const { error: deleteError } = await supabase
         .from('admissions')
         .delete()
