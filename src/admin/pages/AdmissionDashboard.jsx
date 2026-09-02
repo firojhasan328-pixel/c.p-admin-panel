@@ -79,7 +79,6 @@ export default function AdmissionDashboard() {
       <h2 style={styles.title}>📝 অনলাইন আবেদন ফরম</h2>
       <p style={styles.subtitle}>ছাত্র/ছাত্রীদের ভর্তি আবেদন এখানে দেখুন ও ব্যবস্থাপনা করুন</p>
 
-      {/* ✅ ২x২ স্ট্যাটিস্টিক্স কার্ড */}
       <div style={styles.statsGrid}>
         <div style={{ ...styles.statCard, background: 'linear-gradient(135deg, #3b82f6, #2563eb)' }}>
           <div style={styles.statIcon}>📋</div>
@@ -111,7 +110,6 @@ export default function AdmissionDashboard() {
         </div>
       </div>
 
-      {/* ✅ ফিল্টার বার */}
       <div style={styles.filterBar}>
         <input
           type="text"
@@ -134,7 +132,6 @@ export default function AdmissionDashboard() {
         <span style={styles.resultCount}>{filteredData.length} টি আবেদন</span>
       </div>
 
-      {/* ✅ টেবিল */}
       {loading ? (
         <div style={styles.loading}>⏳ লোড হচ্ছে...</div>
       ) : filteredData.length === 0 ? (
