@@ -8,17 +8,13 @@ export default function AdmissionDetailModal({ admission, onClose, onUpdate }) {
   const [zoom, setZoom] = useState(1);
   const [slideIndex, setSlideIndex] = useState(0);
 
-  // =============================================
-  // ✅ ইমেজ লিস্ট তৈরি
-  // =============================================
+  // ✅ ইমেজ লিস্ট
   const images = [];
   if (admission.student_photo) images.push({ url: admission.student_photo, label: 'ছাত্র/ছাত্রীর ছবি' });
   if (admission.birth_cert_photo) images.push({ url: admission.birth_cert_photo, label: 'জন্ম নিবন্ধন' });
   if (admission.father_nid_photo) images.push({ url: admission.father_nid_photo, label: 'বাবার NID' });
 
-  // =============================================
   // ✅ স্ট্যাটাস আপডেট
-  // =============================================
   const handleStatusUpdate = async (newStatus) => {
     setLoading(true);
     try {
@@ -37,13 +33,10 @@ export default function AdmissionDetailModal({ admission, onClose, onUpdate }) {
     setLoading(false);
   };
 
-  // =============================================
   // ✅ PDF ডাউনলোড (html2canvas + jsPDF)
-  // =============================================
   const downloadPDF = async (includeImages = true) => {
     setLoading(true);
     try {
-      // ডাইনামিক ইমপোর্ট (লাইটওয়েট)
       const { default: html2canvas } = await import('html2canvas');
       const { default: jsPDF } = await import('jspdf');
 
@@ -70,9 +63,7 @@ export default function AdmissionDetailModal({ admission, onClose, onUpdate }) {
     setLoading(false);
   };
 
-  // =============================================
   // ✅ ইমেজ ডাউনলোড
-  // =============================================
   const downloadImage = async (url, label) => {
     try {
       const response = await fetch(url);
@@ -88,9 +79,7 @@ export default function AdmissionDetailModal({ admission, onClose, onUpdate }) {
     }
   };
 
-  // =============================================
-  // ✅ ইমেজ ভিউয়ার কন্ট্রোল
-  // =============================================
+  // ✅ ইমেজ ভিউয়ার
   const openImageViewer = (index) => {
     setSlideIndex(index);
     setZoom(1);
@@ -99,7 +88,6 @@ export default function AdmissionDetailModal({ admission, onClose, onUpdate }) {
 
   const closeImageViewer = () => {
     setImageViewerOpen(false);
-    setActiveImage(null);
   };
 
   const handleZoomIn = () => setZoom(prev => Math.min(prev + 0.2, 3));
@@ -123,7 +111,7 @@ export default function AdmissionDetailModal({ admission, onClose, onUpdate }) {
 
           <h2 style={styles.title}>📋 আবেদন বিস্তারিত</h2>
 
-          {/* ✅ পিডিএফ ডাউনলোড বাটন */}
+          {/* ✅ PDF ডাউনলোড বাটন */}
           <div style={styles.pdfButtons}>
             <button onClick={() => downloadPDF(true)} disabled={loading} style={styles.pdfBtn}>
               📄 ছবি সহ PDF ডাউনলোড
@@ -182,6 +170,13 @@ export default function AdmissionDetailModal({ admission, onClose, onUpdate }) {
                   <div key={idx} style={styles.galleryItem} onClick={() => openImageViewer(idx)}>
                     <img src={img.url} alt={img.label} style={styles.galleryThumb} />
                     <span style={styles.galleryLabel}>{img.label}</span>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); downloadImage(img.url, img.label); }}
+                      style={styles.galleryDownloadBtn}
+                      title="ডাউনলোড"
+                    >
+                      📥
+                    </button>
                   </div>
                 ))}
               </div>
@@ -202,7 +197,7 @@ export default function AdmissionDetailModal({ admission, onClose, onUpdate }) {
         </div>
       </div>
 
-      {/* ✅ ইমেজ ভিউয়ার মোডাল */}
+      {/* ✅ ইমেজ ভিউয়ার */}
       {imageViewerOpen && currentImage && (
         <div style={styles.viewerOverlay} onClick={closeImageViewer}>
           <div style={styles.viewerModal} onClick={(e) => e.stopPropagation()}>
@@ -247,7 +242,7 @@ const styles = {
   },
   modal: {
     background: 'white', borderRadius: '20px', padding: '24px',
-    maxWidth: '600px', width: '100%', maxHeight: '90vh', overflowY: 'auto',
+    maxWidth: '620px', width: '100%', maxHeight: '90vh', overflowY: 'auto',
     position: 'relative', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)',
   },
   closeBtn: {
@@ -273,17 +268,15 @@ const styles = {
     background: 'linear-gradient(135deg, #dc2626, #b91c1c)',
     color: 'white', border: 'none', padding: '8px 16px',
     borderRadius: '8px', fontWeight: '600', cursor: 'pointer',
-    fontSize: '13px', flex: 1, minWidth: '140px',
+    fontSize: '13px', flex: 1, minWidth: '130px',
   },
   pdfBtnText: {
     background: 'linear-gradient(135deg, #2563eb, #1d4ed8)',
     color: 'white', border: 'none', padding: '8px 16px',
     borderRadius: '8px', fontWeight: '600', cursor: 'pointer',
-    fontSize: '13px', flex: 1, minWidth: '140px',
+    fontSize: '13px', flex: 1, minWidth: '130px',
   },
-  pdfContent: {
-    display: 'none',
-  },
+  pdfContent: { display: 'none' },
   pdfHeader: { textAlign: 'center', marginBottom: '16px' },
   pdfTitle: { fontSize: '20px', fontWeight: '800', color: '#14532d', margin: 0 },
   pdfSubtitle: { fontSize: '14px', color: '#64748b', margin: '4px 0' },
@@ -291,20 +284,33 @@ const styles = {
   pdfBody: { display: 'flex', flexDirection: 'column', gap: '6px' },
   pdfRow: { fontSize: '13px', padding: '4px 0', borderBottom: '1px solid #f1f5f9' },
   content: { display: 'flex', flexDirection: 'column', gap: '10px' },
-  row: { display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #f1f5f9', flexWrap: 'wrap', gap: '4px' },
-  label: { fontWeight: '600', color: '#64748b', fontSize: '14px' },
-  value: { fontWeight: '500', color: '#0f172a', fontSize: '14px', textAlign: 'right' },
-  statusBadge: { padding: '4px 12px', borderRadius: '20px', fontSize: '13px', fontWeight: '600' },
+  row: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    padding: '8px 0',
+    borderBottom: '1px solid #f1f5f9',
+    flexWrap: 'wrap',
+    gap: '4px',
+  },
+  label: { fontWeight: '600', color: '#64748b', fontSize: '14px', flex: '0 0 40%' },
+  value: { fontWeight: '500', color: '#0f172a', fontSize: '14px', textAlign: 'right', flex: '0 0 55%' },
+  statusBadge: { padding: '4px 14px', borderRadius: '20px', fontSize: '13px', fontWeight: '600' },
   gallerySection: { marginTop: '16px', borderTop: '1px solid #e2e8f0', paddingTop: '12px' },
   galleryTitle: { fontSize: '15px', fontWeight: '700', color: '#0f172a', margin: '0 0 10px 0' },
-  galleryGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '10px' },
+  galleryGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '12px' },
   galleryItem: {
     background: '#f8fafc', borderRadius: '10px', padding: '8px',
     textAlign: 'center', cursor: 'pointer', border: '1px solid #e2e8f0',
-    transition: 'transform 0.2s',
+    position: 'relative', transition: 'transform 0.2s',
   },
-  galleryThumb: { width: '100%', height: '80px', objectFit: 'cover', borderRadius: '6px' },
+  galleryThumb: { width: '100%', height: '90px', objectFit: 'cover', borderRadius: '6px' },
   galleryLabel: { fontSize: '11px', color: '#64748b', display: 'block', marginTop: '4px' },
+  galleryDownloadBtn: {
+    position: 'absolute', top: '6px', right: '6px',
+    background: 'rgba(0,0,0,0.6)', border: 'none',
+    color: 'white', padding: '4px 8px', borderRadius: '6px',
+    cursor: 'pointer', fontSize: '14px',
+  },
   actionRow: { display: 'flex', gap: '12px', marginTop: '16px', justifyContent: 'center', flexWrap: 'wrap' },
   approveBtn: {
     background: 'linear-gradient(135deg, #16a34a, #15803d)',
@@ -345,10 +351,7 @@ const styles = {
     color: 'white', padding: '6px 14px', borderRadius: '20px',
     cursor: 'pointer', fontSize: '14px', fontWeight: '600',
   },
-  viewerCounter: {
-    color: 'white', fontSize: '14px', fontWeight: '500',
-    padding: '0 10px',
-  },
+  viewerCounter: { color: 'white', fontSize: '14px', fontWeight: '500', padding: '0 10px' },
   viewerImageWrapper: {
     width: '100%', height: '80%', display: 'flex',
     alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
