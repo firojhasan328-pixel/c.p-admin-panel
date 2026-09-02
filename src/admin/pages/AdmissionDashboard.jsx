@@ -198,7 +198,17 @@ export default function AdmissionDashboard() {
                       {new Date(ad.created_at).toLocaleDateString('bn-BD')}
                     </td>
                     <td style={styles.td}>
-                      {ad.status === 'pending' ? (
+                      {/* ✅ ডিটেইলস বাটন */}
+                      <button
+                        onClick={() => {
+                          setSelectedAdmission(ad);
+                          setModalOpen(true);
+                        }}
+                        style={styles.detailBtn}
+                      >
+                        📋 বিস্তারিত
+                      </button>
+                      {ad.status === 'pending' && (
                         <div style={styles.actionButtons}>
                           <button
                             onClick={() => updateStatus(ad.id, 'approved')}
@@ -217,7 +227,8 @@ export default function AdmissionDashboard() {
                             ❌
                           </button>
                         </div>
-                      ) : (
+                      )}
+                      {ad.status !== 'pending' && (
                         <span style={styles.statusText}>
                           {ad.status === 'approved' ? '✅' : '❌'}
                         </span>
@@ -231,6 +242,7 @@ export default function AdmissionDashboard() {
         </div>
       )}
 
+      {/* ✅ মোডাল */}
       {modalOpen && selectedAdmission && (
         <AdmissionDetailModal
           admission={selectedAdmission}
@@ -367,9 +379,21 @@ const styles = {
     display: 'inline-block',
     whiteSpace: 'nowrap',
   },
+  detailBtn: {
+    background: '#e0e7ff',
+    color: '#4338ca',
+    border: 'none',
+    padding: '5px 12px',
+    borderRadius: '6px',
+    fontWeight: '600',
+    cursor: 'pointer',
+    fontSize: 'clamp(11px, 1.2vw, 13px)',
+    marginRight: '6px',
+    whiteSpace: 'nowrap',
+  },
   actionButtons: {
-    display: 'flex',
-    gap: '6px',
+    display: 'inline-flex',
+    gap: '4px',
     flexWrap: 'wrap',
   },
   approveBtn: {
@@ -393,7 +417,7 @@ const styles = {
   statusText: { fontSize: 'clamp(16px, 1.8vw, 20px)' },
 };
 
-// ✅ মোবাইলের জন্য অতিরিক্ত স্টাইল (ইনলাইন)
+// ✅ মোবাইলের জন্য অতিরিক্ত স্টাইল
 const mobileStyles = `
   @media (max-width: 640px) {
     .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
@@ -402,6 +426,7 @@ const mobileStyles = `
     .search-input, .filter-select, .refresh-btn { width: 100%; }
     .table th, .table td { padding: 8px 10px; font-size: 12px; }
     .action-buttons { flex-direction: row; gap: 4px; }
+    .detail-btn { font-size: 11px; padding: 4px 10px; }
   }
 `;
 
