@@ -5,6 +5,7 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import AdminLayout from './components/AdminLayout';
 import HomepageEditor from './pages/HomepageEditor';
+import AdmissionDashboard from './pages/AdmissionDashboard';
 import TeachersManager from './pages/TeachersManager';
 import StudentsManager from './pages/StudentsManager';
 import NoticeManager from './pages/NoticeManager';
@@ -64,6 +65,7 @@ export default function AdminApp() {
           {/* সাধারণ পেজ (সব অ্যাডমিন দেখতে পারে) */}
           <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
           <Route path="/homepage" element={<ProtectedRoute><HomepageEditor /></ProtectedRoute>} />
+          <Route path="/admissions" element={<ProtectedRoute><AdmissionDashboard /></ProtectedRoute>} />
           <Route path="/teachers" element={<ProtectedRoute><TeachersManager /></ProtectedRoute>} />
           <Route path="/students" element={<ProtectedRoute><StudentsManager /></ProtectedRoute>} />
           <Route path="/notices" element={<ProtectedRoute><NoticeManager /></ProtectedRoute>} />
