@@ -1,15 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../supabaseClient';
-import StudentDetailModal from '../components/StudentDetailModal';
 
 export default function StudentApproval() {
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({ total: 0, pending: 0, approved: 0, rejected: 0 });
-  const [selectedStudent, setSelectedStudent] = useState(null);
-  const [modalOpen, setModalOpen] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
 
+  // =============================================
+  // ✅ ডেটা ফেচ
+  // =============================================
   const fetchStudents = async () => {
     setLoading(true);
     try {
@@ -28,10 +28,14 @@ export default function StudentApproval() {
       setStats({ total, pending, approved, rejected });
     } catch (error) {
       console.error('Fetch error:', error);
+      alert('❌ ডেটা লোড করতে সমস্যা');
     }
     setLoading(false);
   };
 
+  // =============================================
+  // ✅ Realtime subscription
+  // =============================================
   useEffect(() => {
     fetchStudents();
 
@@ -45,6 +49,9 @@ export default function StudentApproval() {
     return () => supabase.removeChannel(channel);
   }, []);
 
+  // =============================================
+  // ✅ অনুমোদন/বাতিল
+  // =============================================
   const updateStatus = async (id, newStatus) => {
     const confirmMsg = newStatus === true 
       ? '✅ এই ছাত্রকে অনুমোদন করতে চান?'
@@ -69,17 +76,33 @@ export default function StudentApproval() {
     setActionLoading(false);
   };
 
+  // =============================================
+  // ✅ স্ট্যাটাস ব্যাজ
+  // =============================================
   const getStatusBadge = (isApproved) => {
     if (isApproved === true) return { label: '✅ অনুমোদিত', color: '#16a34a', bg: '#dcfce7' };
     if (isApproved === false) return { label: '❌ বাতিল', color: '#dc2626', bg: '#fee2e2' };
     return { label: '⏳ pending', color: '#f59e0b', bg: '#fef3c7' };
   };
 
+  // =============================================
+  // ✅ রেন্ডার
+  // =============================================
+  if (loading) {
+    return (
+      <div style={styles.loading}>
+        <div style={styles.spinner}></div>
+        <p>⏳ লোড হচ্ছে...</p>
+      </div>
+    );
+  }
+
   return (
     <div style={styles.container}>
       <h2 style={styles.title}>✅ ছাত্র অনুমোদন</h2>
       <p style={styles.subtitle}>নতুন রেজিস্টার করা ছাত্রদের অনুমোদন বা বাতিল করুন</p>
 
+      {/* ✅ স্ট্যাটিস্টিক্স কার্ড */}
       <div style={styles.statsGrid}>
         <div style={{ ...styles.statCard, background: 'linear-gradient(135deg, #3b82f6, #2563eb)' }}>
           <div style={styles.statIcon}>📋</div>
@@ -111,6 +134,7 @@ export default function StudentApproval() {
         </div>
       </div>
 
+      {/* ✅ ফিল্টার বার */}
       <div style={styles.filterBar}>
         <input
           type="text"
@@ -150,9 +174,8 @@ export default function StudentApproval() {
         <span style={styles.resultCount}>{students.length} টি</span>
       </div>
 
-      {loading ? (
-        <div style={styles.loading}>⏳ লোড হচ্ছে...</div>
-      ) : students.length === 0 ? (
+      {/* ✅ টেবিল */}
+      {students.length === 0 ? (
         <div style={styles.emptyState}>
           <span style={styles.emptyIcon}>📭</span>
           <p>কোনো ছাত্র পাওয়া যায়নি</p>
@@ -177,17 +200,7 @@ export default function StudentApproval() {
                 return (
                   <tr key={student.id} style={styles.tr}>
                     <td style={styles.td}>{index + 1}</td>
-                    <td style={styles.td}>
-                      <span
-                        style={styles.clickableName}
-                        onClick={() => {
-                          setSelectedStudent(student);
-                          setModalOpen(true);
-                        }}
-                      >
-                        {student.name}
-                      </span>
-                    </td>
+                    <td style={styles.td}>{student.name}</td>
                     <td style={styles.td}>{student.class_name || '—'}</td>
                     <td style={styles.td}>{student.email || '—'}</td>
                     <td style={styles.td}>
@@ -199,16 +212,6 @@ export default function StudentApproval() {
                       {new Date(student.created_at).toLocaleDateString('bn-BD')}
                     </td>
                     <td style={styles.td}>
-                      <button
-                        onClick={() => {
-                          setSelectedStudent(student);
-                          setModalOpen(true);
-                        }}
-                        style={styles.detailBtn}
-                        title="বিস্তারিত"
-                      >
-                        📋
-                      </button>
                       {(student.is_approved === undefined || student.is_approved === null) && (
                         <div style={styles.actionButtons}>
                           <button
@@ -229,6 +232,8 @@ export default function StudentApproval() {
                           </button>
                         </div>
                       )}
+                      {student.is_approved === true && <span style={styles.statusText}>✅</span>}
+                      {student.is_approved === false && <span style={styles.statusText}>❌</span>}
                     </td>
                   </tr>
                 );
@@ -237,92 +242,175 @@ export default function StudentApproval() {
           </table>
         </div>
       )}
-
-      {modalOpen && selectedStudent && (
-        <StudentDetailModal
-          student={selectedStudent}
-          onClose={() => setModalOpen(false)}
-          onUpdate={fetchStudents}
-        />
-      )}
     </div>
   );
 }
 
+// =============================================
+// 🎨 স্টাইল
+// =============================================
 const styles = {
-  container: { maxWidth: '1200px', margin: '0 auto', padding: '0 16px', fontFamily: "'Hind Siliguri', sans-serif" },
-  title: { fontSize: '24px', fontWeight: '700', color: '#0f172a', margin: '0 0 4px 0' },
-  subtitle: { fontSize: '14px', color: '#64748b', margin: '0 0 24px 0' },
+  container: {
+    maxWidth: '1200px',
+    margin: '0 auto',
+    padding: '0 16px',
+    fontFamily: "'Hind Siliguri', sans-serif",
+  },
+  loading: {
+    textAlign: 'center',
+    padding: '60px 0',
+    color: '#64748b',
+  },
+  spinner: {
+    width: '48px',
+    height: '48px',
+    border: '4px solid #e2e8f0',
+    borderTop: '4px solid #16a34a',
+    borderRadius: '50%',
+    animation: 'spin 1s linear infinite',
+    margin: '0 auto 16px',
+  },
+  title: {
+    fontSize: '24px',
+    fontWeight: '700',
+    color: '#0f172a',
+    margin: '0 0 4px 0',
+  },
+  subtitle: {
+    fontSize: '14px',
+    color: '#64748b',
+    margin: '0 0 24px 0',
+  },
   statsGrid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
     gap: '16px',
     marginBottom: '24px',
   },
   statCard: {
-    display: 'flex', alignItems: 'center', gap: '16px',
-    padding: '20px 24px', borderRadius: '14px', color: 'white',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '14px',
+    padding: '18px 20px',
+    borderRadius: '14px',
+    color: 'white',
     boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+    minHeight: '70px',
   },
-  statIcon: { fontSize: '32px' },
-  statNumber: { fontSize: '28px', fontWeight: '800', lineHeight: 1.2 },
+  statIcon: { fontSize: '28px' },
+  statNumber: { fontSize: '26px', fontWeight: '800', lineHeight: 1.2 },
   statLabel: { fontSize: '13px', opacity: 0.9 },
   filterBar: {
-    display: 'flex', gap: '12px', flexWrap: 'wrap',
-    marginBottom: '20px', padding: '16px',
-    background: 'white', borderRadius: '12px',
+    display: 'flex',
+    gap: '12px',
+    flexWrap: 'wrap',
+    marginBottom: '20px',
+    padding: '16px',
+    background: 'white',
+    borderRadius: '12px',
     border: '1px solid #e2e8f0',
   },
   searchInput: {
-    flex: 1, minWidth: '200px',
-    padding: '10px 14px', borderRadius: '10px',
-    border: '1.5px solid #e2e8f0', fontSize: '14px',
+    flex: 1,
+    minWidth: '180px',
+    padding: '10px 14px',
+    borderRadius: '10px',
+    border: '1.5px solid #e2e8f0',
+    fontSize: '14px',
     outline: 'none',
   },
   filterSelect: {
-    padding: '10px 14px', borderRadius: '10px',
-    border: '1.5px solid #e2e8f0', fontSize: '14px',
-    outline: 'none', background: 'white',
+    padding: '10px 14px',
+    borderRadius: '10px',
+    border: '1.5px solid #e2e8f0',
+    fontSize: '14px',
+    outline: 'none',
+    background: 'white',
+    minWidth: '120px',
   },
   refreshBtn: {
-    padding: '10px 20px', borderRadius: '10px',
-    border: 'none', background: '#f1f5f9',
-    fontWeight: '600', cursor: 'pointer',
+    padding: '10px 20px',
+    borderRadius: '10px',
+    border: 'none',
+    background: '#f1f5f9',
+    fontWeight: '600',
+    cursor: 'pointer',
+    fontSize: '14px',
+    whiteSpace: 'nowrap',
   },
   resultCount: {
-    display: 'flex', alignItems: 'center',
-    fontSize: '14px', color: '#64748b', fontWeight: '500',
+    display: 'flex',
+    alignItems: 'center',
+    fontSize: '14px',
+    color: '#64748b',
+    fontWeight: '500',
   },
-  loading: { textAlign: 'center', padding: '40px 0', color: '#94a3b8' },
-  emptyState: { textAlign: 'center', padding: '60px 0', color: '#94a3b8' },
-  emptyIcon: { fontSize: '48px', display: 'block', marginBottom: '12px' },
-  tableWrapper: { overflowX: 'auto', background: 'white', borderRadius: '14px', border: '1px solid #e2e8f0' },
-  table: { width: '100%', borderCollapse: 'collapse', fontSize: '14px', minWidth: '650px' },
+  emptyState: {
+    textAlign: 'center',
+    padding: '60px 0',
+    color: '#94a3b8',
+  },
+  emptyIcon: {
+    fontSize: '48px',
+    display: 'block',
+    marginBottom: '12px',
+  },
+  tableWrapper: {
+    overflowX: 'auto',
+    background: 'white',
+    borderRadius: '14px',
+    border: '1px solid #e2e8f0',
+  },
+  table: {
+    width: '100%',
+    borderCollapse: 'collapse',
+    fontSize: '14px',
+    minWidth: '600px',
+  },
   th: {
-    padding: '12px 16px', textAlign: 'left',
-    background: '#f8fafc', fontWeight: '700',
-    color: '#334155', borderBottom: '2px solid #e2e8f0',
+    padding: '12px 16px',
+    textAlign: 'left',
+    background: '#f8fafc',
+    fontWeight: '700',
+    color: '#334155',
+    borderBottom: '2px solid #e2e8f0',
     whiteSpace: 'nowrap',
   },
   tr: { borderBottom: '1px solid #f1f5f9' },
   td: { padding: '12px 16px', verticalAlign: 'middle' },
-  clickableName: {
-    color: '#2563eb', fontWeight: '600',
-    cursor: 'pointer', textDecoration: 'underline',
-  },
-  badge: { padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: '600', display: 'inline-block' },
-  detailBtn: {
-    background: '#e0e7ff', color: '#4338ca', border: 'none',
-    padding: '5px 12px', borderRadius: '6px', fontWeight: '600',
-    cursor: 'pointer', fontSize: '14px', marginRight: '6px',
+  badge: {
+    padding: '4px 12px',
+    borderRadius: '20px',
+    fontSize: '12px',
+    fontWeight: '600',
+    display: 'inline-block',
   },
   actionButtons: { display: 'inline-flex', gap: '4px' },
   approveBtn: {
-    background: '#dcfce7', border: 'none', padding: '5px 10px',
-    borderRadius: '6px', cursor: 'pointer', fontSize: '16px',
+    background: '#dcfce7',
+    border: 'none',
+    padding: '5px 10px',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    fontSize: '16px',
   },
   rejectBtn: {
-    background: '#fee2e2', border: 'none', padding: '5px 10px',
-    borderRadius: '6px', cursor: 'pointer', fontSize: '16px',
+    background: '#fee2e2',
+    border: 'none',
+    padding: '5px 10px',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    fontSize: '16px',
   },
+  statusText: { fontSize: '18px' },
 };
+
+// ✅ অ্যানিমেশন
+const styleSheet = document.createElement('style');
+styleSheet.textContent = `
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+`;
+document.head.appendChild(styleSheet);
