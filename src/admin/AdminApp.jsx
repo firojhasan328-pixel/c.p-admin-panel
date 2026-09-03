@@ -6,6 +6,7 @@ import Dashboard from './pages/Dashboard';
 import AdminLayout from './components/AdminLayout';
 import HomepageEditor from './pages/HomepageEditor';
 import AdmissionDashboard from './pages/AdmissionDashboard';
+import StudentApproval from './pages/StudentApproval';
 import TeachersManager from './pages/TeachersManager';
 import StudentsManager from './pages/StudentsManager';
 import NoticeManager from './pages/NoticeManager';
@@ -41,7 +42,6 @@ function ProtectedRoute({ children, requiredRole }) {
     return <Navigate to="/login" replace />;
   }
 
-  // রোল চেক (যদি requiredRole দেওয়া থাকে)
   if (requiredRole) {
     const userRole = adminUser?.role;
     if (requiredRole === 'super_admin' && userRole !== 'super_admin') {
@@ -62,10 +62,10 @@ export default function AdminApp() {
         <Routes>
           <Route path="/login" element={<Login />} />
           
-          {/* সাধারণ পেজ (সব অ্যাডমিন দেখতে পারে) */}
           <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
           <Route path="/homepage" element={<ProtectedRoute><HomepageEditor /></ProtectedRoute>} />
           <Route path="/admissions" element={<ProtectedRoute><AdmissionDashboard /></ProtectedRoute>} />
+          <Route path="/student-approval" element={<ProtectedRoute><StudentApproval /></ProtectedRoute>} />
           <Route path="/teachers" element={<ProtectedRoute><TeachersManager /></ProtectedRoute>} />
           <Route path="/students" element={<ProtectedRoute><StudentsManager /></ProtectedRoute>} />
           <Route path="/notices" element={<ProtectedRoute><NoticeManager /></ProtectedRoute>} />
@@ -77,7 +77,6 @@ export default function AdminApp() {
           <Route path="/seo" element={<ProtectedRoute><SEO /></ProtectedRoute>} />
           <Route path="/media" element={<ProtectedRoute><MediaLibrary /></ProtectedRoute>} />
           
-          {/* শুধু সুপার অ্যাডমিন দেখতে পারে */}
           <Route path="/users" element={<ProtectedRoute requiredRole="super_admin"><Users /></ProtectedRoute>} />
           <Route path="/permissions" element={<ProtectedRoute requiredRole="super_admin"><Permissions /></ProtectedRoute>} />
           <Route path="/backup" element={<ProtectedRoute requiredRole="super_admin"><Backup /></ProtectedRoute>} />
