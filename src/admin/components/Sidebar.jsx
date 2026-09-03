@@ -16,6 +16,7 @@ const getMenuItems = (role, hasPermission) => {
   const adminMenus = [
     { path: '/homepage', icon: '🏠', label: 'হোমপেজ', permission: 'edit_homepage' },
     { path: '/admissions', icon: '📝', label: 'অনলাইন আবেদন ফরম', permission: 'manage_admissions' },
+    { path: '/student-approval', icon: '✅', label: 'ছাত্র অনুমোদন', permission: 'manage_students' },
     { path: '/teachers', icon: '👨‍🏫', label: 'শিক্ষক', permission: 'manage_teachers' },
     { path: '/students', icon: '🎓', label: 'ছাত্র', permission: 'manage_students' },
     { path: '/notices', icon: '📢', label: 'নোটিশ', permission: 'manage_notices' },
