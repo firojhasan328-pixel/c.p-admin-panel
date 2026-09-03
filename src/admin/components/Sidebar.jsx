@@ -27,6 +27,10 @@ const getMenuItems = (role, hasPermission) => {
     { path: '/settings', icon: '⚙️', label: 'সেটিংস', permission: 'manage_settings' },
     { path: '/seo', icon: '🔍', label: 'এসইও', permission: 'manage_seo' },
     { path: '/media', icon: '📁', label: 'মিডিয়া', permission: 'manage_media' },
+    // ✅ নতুন মেনু: রেজিস্ট্রেশন কোড
+    { path: '/registration-codes', icon: '🔑', label: 'রেজিস্ট্রেশন কোড', permission: 'manage_registration' },
+    // ✅ নতুন মেনু: ছাত্র অনুরোধ
+    { path: '/registration-requests', icon: '📩', label: 'ছাত্র অনুরোধ', permission: 'manage_students' },
   ];
 
   // শুধু সুপার অ্যাডমিন দেখতে পারে
