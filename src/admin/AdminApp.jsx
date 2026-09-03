@@ -22,6 +22,9 @@ import Permissions from './pages/Permissions';
 import Backup from './pages/Backup';
 import ActivityLogs from './pages/ActivityLogs';
 import RecycleBin from './pages/RecycleBin';
+// ✅ নতুন ইমপোর্ট
+import RegistrationCodes from './pages/RegistrationCodes';
+import RegistrationRequests from './pages/RegistrationRequests';
 
 // =============================================
 // ✅ প্রোটেক্টেড রাউট (রোল অনুযায়ী চেক)
@@ -76,6 +79,18 @@ export default function AdminApp() {
           <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
           <Route path="/seo" element={<ProtectedRoute><SEO /></ProtectedRoute>} />
           <Route path="/media" element={<ProtectedRoute><MediaLibrary /></ProtectedRoute>} />
+          
+          {/* ✅ নতুন রাউট: রেজিস্ট্রেশন কোড */}
+          <Route 
+            path="/registration-codes" 
+            element={<ProtectedRoute><RegistrationCodes /></ProtectedRoute>} 
+          />
+          
+          {/* ✅ নতুন রাউট: ছাত্র অনুরোধ */}
+          <Route 
+            path="/registration-requests" 
+            element={<ProtectedRoute><RegistrationRequests /></ProtectedRoute>} 
+          />
           
           <Route path="/users" element={<ProtectedRoute requiredRole="super_admin"><Users /></ProtectedRoute>} />
           <Route path="/permissions" element={<ProtectedRoute requiredRole="super_admin"><Permissions /></ProtectedRoute>} />
