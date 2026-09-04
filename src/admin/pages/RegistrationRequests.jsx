@@ -7,16 +7,13 @@ export default function RegistrationRequests() {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
-  const [filter, setFilter] = useState('all'); // all | pending | approved | rejected
+  const [filter, setFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
 
-  // =============================================
-  // ✅ ডেটা ফেচ
-  // =============================================
   useEffect(() => {
     fetchRequests();
   }, []);
@@ -38,9 +35,7 @@ export default function RegistrationRequests() {
     setLoading(false);
   };
 
-  // =============================================
-  // ✅ রিয়েলটাইম সাবস্ক্রিপশন
-  // =============================================
+  // রিয়েলটাইম সাবস্ক্রিপশন
   useEffect(() => {
     const channel = supabase
       .channel('registration-requests-realtime')
@@ -79,12 +74,12 @@ export default function RegistrationRequests() {
 
       if (updateError) throw updateError;
 
-      // ২. students টেবিলে যোগ করুন
-      const studentData = {
+      // ২. role অনুযায়ী সঠিক টেবিলে যোগ করুন
+      const isTeacher = request.role === 'teacher';
+      const tableName = isTeacher ? 'teachers' : 'students';
+
+      const profileData = {
         name: request.student_name,
-        class_name: request.class_name,
-        father_name: request.father_name || null,
-        mother_name: request.mother_name || null,
         phone: request.phone,
         email: request.email,
         photo_url: request.student_photo || null,
@@ -93,27 +88,53 @@ export default function RegistrationRequests() {
         created_at: new Date().toISOString(),
       };
 
+      // শিক্ষক হলে অতিরিক্ত ফিল্ড
+      if (isTeacher) {
+        profileData.designation = request.designation || 'শিক্ষক';
+        profileData.subject = request.subject || '—';
+        profileData.gender = request.gender || null;
+      } else {
+        // ছাত্র হলে
+        profileData.class_name = request.class_name || '—';
+        profileData.father_name = request.father_name || null;
+        profileData.mother_name = request.mother_name || null;
+        profileData.village = request.village || null;
+        profileData.roll_number = request.roll_number || null;
+      }
+
       // ইমেইল দিয়ে existing চেক
-      const { data: existingStudent } = await supabase
-        .from('students')
+      const { data: existingUser } = await supabase
+        .from(tableName)
         .select('id')
         .eq('email', request.email)
         .maybeSingle();
 
-      if (existingStudent) {
-        // ইতিমধ্যে আছে → আপডেট
+      if (existingUser) {
         await supabase
-          .from('students')
-          .update(studentData)
-          .eq('id', existingStudent.id);
+          .from(tableName)
+          .update(profileData)
+          .eq('id', existingUser.id);
       } else {
-        // নতুন → ইনসার্ট
+        // নতুন ইউজার আইডি তৈরি
+        const { data: authData } = await supabase.auth.admin.createUser({
+          email: request.email,
+          password: 'temporary123',
+          email_confirm: true,
+          user_metadata: { name: request.student_name, role: isTeacher ? 'teacher' : 'student' }
+        });
+
+        if (authData?.user) {
+          profileData.id = authData.user.id;
+        } else {
+          profileData.id = crypto.randomUUID();
+        }
+
         await supabase
-          .from('students')
-          .insert([studentData]);
+          .from(tableName)
+          .insert([profileData]);
       }
 
-      // ৩. registration_codes টেবিলে is_used = true করুন
+      // ৩. registration_codes আপডেট
       await supabase
         .from('registration_codes')
         .update({
@@ -130,11 +151,11 @@ export default function RegistrationRequests() {
           code: request.code,
           action: 'approved',
           email: request.email,
+          role: isTeacher ? 'teacher' : 'student',
         }]);
 
-      setSuccessMessage(`✅ "${request.student_name}" অনুমোদন করা হয়েছে! ছাত্র এখন লগইন করতে পারবে।`);
+      setSuccessMessage(`✅ "${request.student_name}" অনুমোদন করা হয়েছে!`);
       await fetchRequests();
-
       setTimeout(() => setSuccessMessage(''), 5000);
 
     } catch (error) {
@@ -166,7 +187,6 @@ export default function RegistrationRequests() {
 
       if (error) throw error;
 
-      // লগ তৈরি
       await supabase
         .from('registration_logs')
         .insert([{
@@ -177,7 +197,6 @@ export default function RegistrationRequests() {
 
       setSuccessMessage(`❌ "${request.student_name}"-এর অনুরোধ বাতিল করা হয়েছে!`);
       await fetchRequests();
-
       setTimeout(() => setSuccessMessage(''), 5000);
 
     } catch (error) {
@@ -188,7 +207,7 @@ export default function RegistrationRequests() {
   };
 
   // =============================================
-  // ✅ ডিলিট (রিসাইকেল বিনে)
+  // ✅ ডিলিট
   // =============================================
   const handleDelete = async (request) => {
     if (!confirm(`"${request.student_name}"-এর অনুরোধটি রিসাইকেল বিনে সরাতে চান?`)) return;
@@ -196,7 +215,6 @@ export default function RegistrationRequests() {
     setActionLoading(true);
 
     try {
-      // রিসাইকেল বিনে পাঠান
       await supabase
         .from('recycle_bin')
         .insert([{
@@ -208,7 +226,6 @@ export default function RegistrationRequests() {
           deleted_at: new Date().toISOString(),
         }]);
 
-      // মূল টেবিল থেকে ডিলিট
       await supabase
         .from('registration_requests')
         .delete()
@@ -216,7 +233,6 @@ export default function RegistrationRequests() {
 
       setSuccessMessage(`✅ "${request.student_name}"-এর অনুরোধ রিসাইকেল বিনে সরানো হয়েছে!`);
       await fetchRequests();
-
       setTimeout(() => setSuccessMessage(''), 5000);
 
     } catch (error) {
@@ -232,7 +248,6 @@ export default function RegistrationRequests() {
   const getFilteredRequests = () => {
     let filtered = requests;
 
-    // সার্চ
     if (searchTerm) {
       filtered = filtered.filter(r =>
         r.student_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -242,9 +257,16 @@ export default function RegistrationRequests() {
       );
     }
 
-    // ফিল্টার
-    if (filter !== 'all') {
-      filtered = filtered.filter(r => r.status === filter);
+    if (filter === 'pending') {
+      filtered = filtered.filter(r => r.status === 'pending');
+    } else if (filter === 'approved') {
+      filtered = filtered.filter(r => r.status === 'approved');
+    } else if (filter === 'rejected') {
+      filtered = filtered.filter(r => r.status === 'rejected');
+    } else if (filter === 'student') {
+      filtered = filtered.filter(r => r.role === 'student' || !r.role);
+    } else if (filter === 'teacher') {
+      filtered = filtered.filter(r => r.role === 'teacher');
     }
 
     return filtered;
@@ -259,6 +281,7 @@ export default function RegistrationRequests() {
   const pending = requests.filter(r => r.status === 'pending').length;
   const approved = requests.filter(r => r.status === 'approved').length;
   const rejected = requests.filter(r => r.status === 'rejected').length;
+  const teacherRequests = requests.filter(r => r.role === 'teacher').length;
 
   // =============================================
   // ✅ স্ট্যাটাস ব্যাজ
@@ -273,11 +296,21 @@ export default function RegistrationRequests() {
   };
 
   // =============================================
+  // ✅ রোল ব্যাজ
+  // =============================================
+  const getRoleBadge = (role) => {
+    if (role === 'teacher') {
+      return { label: '👨‍🏫 শিক্ষক', background: '#fef3c7', color: '#f59e0b' };
+    }
+    return { label: '🎓 ছাত্র', background: '#dbeafe', color: '#2563eb' };
+  };
+
+  // =============================================
   // ✅ রেন্ডার
   // =============================================
   return (
     <div style={styles.container}>
-      {/* ✅ পপআপ মেসেজ */}
+      {/* পপআপ মেসেজ */}
       {successMessage && (
         <div style={styles.popupSuccess}>
           <span style={styles.popupIcon}>✅</span>
@@ -294,10 +327,10 @@ export default function RegistrationRequests() {
         </div>
       )}
 
-      <h2 style={styles.title}>📩 ছাত্র অনুরোধ</h2>
+      <h2 style={styles.title}>📩 ছাত্র/শিক্ষক অনুরোধ</h2>
       <p style={styles.subtitle}>যারা কোড যাচাই করে রেজিস্ট্রেশন করেছেন তাদের অনুরোধ এখানে দেখুন ও ব্যবস্থাপনা করুন</p>
 
-      {/* ✅ স্ট্যাটিস্টিক্স */}
+      {/* স্ট্যাটিস্টিক্স */}
       <div style={styles.statsGrid}>
         <div style={{ ...styles.statCard, background: 'linear-gradient(135deg, #3b82f6, #2563eb)' }}>
           <div style={styles.statIcon}>📋</div>
@@ -320,16 +353,16 @@ export default function RegistrationRequests() {
             <div style={styles.statLabel}>অনুমোদিত</div>
           </div>
         </div>
-        <div style={{ ...styles.statCard, background: 'linear-gradient(135deg, #dc2626, #b91c1c)' }}>
-          <div style={styles.statIcon}>❌</div>
+        <div style={{ ...styles.statCard, background: 'linear-gradient(135deg, #8b5cf6, #7c3aed)' }}>
+          <div style={styles.statIcon}>👨‍🏫</div>
           <div>
-            <div style={styles.statNumber}>{rejected}</div>
-            <div style={styles.statLabel}>বাতিল</div>
+            <div style={styles.statNumber}>{teacherRequests}</div>
+            <div style={styles.statLabel}>শিক্ষক অনুরোধ</div>
           </div>
         </div>
       </div>
 
-      {/* ✅ ফিল্টার বার */}
+      {/* ফিল্টার বার */}
       <div style={styles.filterBar}>
         <input
           type="text"
@@ -347,12 +380,14 @@ export default function RegistrationRequests() {
           <option value="pending">⏳ pending</option>
           <option value="approved">✅ অনুমোদিত</option>
           <option value="rejected">❌ বাতিল</option>
+          <option value="student">🎓 শুধু ছাত্র</option>
+          <option value="teacher">👨‍🏫 শুধু শিক্ষক</option>
         </select>
         <button onClick={fetchRequests} style={styles.refreshBtn}>🔄 রিফ্রেশ</button>
         <span style={styles.resultCount}>{filteredRequests.length} টি</span>
       </div>
 
-      {/* ✅ টেবিল */}
+      {/* টেবিল */}
       {loading ? (
         <div style={styles.loading}>
           <div style={styles.spinner}></div>
@@ -369,8 +404,9 @@ export default function RegistrationRequests() {
             <thead>
               <tr>
                 <th style={styles.th}>#</th>
-                <th style={styles.th}>ছাত্রের নাম</th>
-                <th style={styles.th}>ক্লাস</th>
+                <th style={styles.th}>নাম</th>
+                <th style={styles.th}>রোল</th>
+                <th style={styles.th}>ক্লাস/পদবী</th>
                 <th style={styles.th}>কোড</th>
                 <th style={styles.th}>ফোন</th>
                 <th style={styles.th}>ইমেইল</th>
@@ -382,6 +418,7 @@ export default function RegistrationRequests() {
             <tbody>
               {filteredRequests.map((request, index) => {
                 const badge = getStatusBadge(request.status);
+                const roleBadge = getRoleBadge(request.role);
                 return (
                   <tr key={request.id} style={styles.tr}>
                     <td style={styles.td}>{index + 1}</td>
@@ -397,7 +434,19 @@ export default function RegistrationRequests() {
                       </span>
                     </td>
                     <td style={styles.td}>
-                      <span style={styles.classBadge}>{request.class_name}</span>
+                      <span style={{
+                        ...styles.roleBadge,
+                        background: roleBadge.background,
+                        color: roleBadge.color,
+                      }}>
+                        {roleBadge.label}
+                      </span>
+                    </td>
+                    <td style={styles.td}>
+                      {request.role === 'teacher' 
+                        ? request.designation || 'শিক্ষক'
+                        : request.class_name || '—'
+                      }
                     </td>
                     <td style={styles.td}>
                       <span style={styles.codeBadge}>{request.code}</span>
@@ -461,12 +510,12 @@ export default function RegistrationRequests() {
         </div>
       )}
 
-      {/* ✅ বিস্তারিত মোডাল */}
+      {/* বিস্তারিত মোডাল */}
       {showDetailModal && selectedRequest && (
         <div style={styles.modalOverlay} onClick={() => setShowDetailModal(false)}>
           <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
             <button onClick={() => setShowDetailModal(false)} style={styles.modalCloseBtn}>✕</button>
-            <h3 style={styles.modalTitle}>📋 ছাত্র বিস্তারিত</h3>
+            <h3 style={styles.modalTitle}>📋 বিস্তারিত</h3>
 
             <div style={styles.modalContent}>
               <div style={styles.modalRow}>
@@ -474,17 +523,46 @@ export default function RegistrationRequests() {
                 <span style={styles.modalValue}>{selectedRequest.student_name}</span>
               </div>
               <div style={styles.modalRow}>
-                <span style={styles.modalLabel}>📚 ক্লাস</span>
-                <span style={styles.modalValue}>{selectedRequest.class_name}</span>
+                <span style={styles.modalLabel}>🎯 রোল</span>
+                <span style={{
+                  ...styles.roleBadge,
+                  background: selectedRequest.role === 'teacher' ? '#fef3c7' : '#dbeafe',
+                  color: selectedRequest.role === 'teacher' ? '#f59e0b' : '#2563eb',
+                }}>
+                  {selectedRequest.role === 'teacher' ? '👨‍🏫 শিক্ষক' : '🎓 ছাত্র'}
+                </span>
               </div>
-              <div style={styles.modalRow}>
-                <span style={styles.modalLabel}>👨 বাবা</span>
-                <span style={styles.modalValue}>{selectedRequest.father_name || '—'}</span>
-              </div>
-              <div style={styles.modalRow}>
-                <span style={styles.modalLabel}>👩 মা</span>
-                <span style={styles.modalValue}>{selectedRequest.mother_name || '—'}</span>
-              </div>
+              {selectedRequest.role === 'teacher' ? (
+                <>
+                  <div style={styles.modalRow}>
+                    <span style={styles.modalLabel}>💼 পদবী</span>
+                    <span style={styles.modalValue}>{selectedRequest.designation || '—'}</span>
+                  </div>
+                  <div style={styles.modalRow}>
+                    <span style={styles.modalLabel}>📚 বিষয়</span>
+                    <span style={styles.modalValue}>{selectedRequest.subject || '—'}</span>
+                  </div>
+                  <div style={styles.modalRow}>
+                    <span style={styles.modalLabel}>⚥ লিঙ্গ</span>
+                    <span style={styles.modalValue}>{selectedRequest.gender || '—'}</span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div style={styles.modalRow}>
+                    <span style={styles.modalLabel}>📚 ক্লাস</span>
+                    <span style={styles.modalValue}>{selectedRequest.class_name || '—'}</span>
+                  </div>
+                  <div style={styles.modalRow}>
+                    <span style={styles.modalLabel}>👨 বাবা</span>
+                    <span style={styles.modalValue}>{selectedRequest.father_name || '—'}</span>
+                  </div>
+                  <div style={styles.modalRow}>
+                    <span style={styles.modalLabel}>👩 মা</span>
+                    <span style={styles.modalValue}>{selectedRequest.mother_name || '—'}</span>
+                  </div>
+                </>
+              )}
               <div style={styles.modalRow}>
                 <span style={styles.modalLabel}>📱 ফোন</span>
                 <span style={styles.modalValue}>{selectedRequest.phone}</span>
@@ -513,14 +591,6 @@ export default function RegistrationRequests() {
                   {new Date(selectedRequest.created_at).toLocaleString('bn-BD')}
                 </span>
               </div>
-              {selectedRequest.approved_at && (
-                <div style={styles.modalRow}>
-                  <span style={styles.modalLabel}>✅ অনুমোদনের তারিখ</span>
-                  <span style={styles.modalValue}>
-                    {new Date(selectedRequest.approved_at).toLocaleString('bn-BD')}
-                  </span>
-                </div>
-              )}
             </div>
 
             {selectedRequest.status === 'pending' && (
@@ -549,7 +619,7 @@ export default function RegistrationRequests() {
 }
 
 // =============================================
-// 🎨 প্রিমিয়াম স্টাইলসমূহ
+// 🎨 স্টাইলসমূহ
 // =============================================
 const styles = {
   container: {
@@ -615,7 +685,7 @@ const styles = {
     fontSize: '14px',
     outline: 'none',
     background: 'white',
-    minWidth: '120px',
+    minWidth: '150px',
   },
   refreshBtn: {
     padding: '10px 20px',
@@ -666,7 +736,7 @@ const styles = {
     width: '100%',
     borderCollapse: 'collapse',
     fontSize: '14px',
-    minWidth: '800px',
+    minWidth: '1000px',
   },
   th: {
     padding: '12px 16px',
@@ -687,12 +757,10 @@ const styles = {
     cursor: 'pointer',
     textDecoration: 'none',
   },
-  classBadge: {
-    background: '#dbeafe',
-    color: '#2563eb',
-    padding: '2px 12px',
-    borderRadius: '20px',
-    fontSize: '12px',
+  roleBadge: {
+    padding: '2px 10px',
+    borderRadius: '12px',
+    fontSize: '11px',
     fontWeight: '600',
     display: 'inline-block',
   },
@@ -785,7 +853,6 @@ const styles = {
     cursor: 'pointer',
     padding: '4px',
   },
-  // মোডাল
   modalOverlay: {
     position: 'fixed',
     top: 0,
