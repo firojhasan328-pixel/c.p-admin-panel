@@ -8,10 +8,11 @@ export default function RegistrationCodes() {
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [batchSize, setBatchSize] = useState(5);
-  const [filter, setFilter] = useState('all'); // all | used | unused | expired
+  const [filter, setFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
+  const [selectedRole, setSelectedRole] = useState('student');
 
   useEffect(() => {
     fetchCodes();
@@ -35,7 +36,7 @@ export default function RegistrationCodes() {
   };
 
   // =============================================
-  // ✅ কোড জেনারেট (৮ ডিজিট আলফানিউমেরিক)
+  // ✅ কোড জেনারেট (রোল সহ)
   // =============================================
   const generateCodes = async () => {
     setGenerating(true);
@@ -53,6 +54,7 @@ export default function RegistrationCodes() {
           generated_by: adminUser?.email || 'admin',
           batch_id: batchId,
           expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+          role: selectedRole, // ✅ রোল যোগ করুন
         });
       }
 
@@ -66,7 +68,6 @@ export default function RegistrationCodes() {
       setSuccessMessage(`✅ ${batchSize} টি কোড সফলভাবে জেনারেট করা হয়েছে!`);
       await fetchCodes();
 
-      // কপি করার জন্য কোডগুলো দেখান
       const codeList = newCodes.map(c => c.code).join('\n');
       if (confirm(`📋 কোডগুলো কপি করতে চান?\n\n${codeList}`)) {
         navigator.clipboard.writeText(codeList);
@@ -81,7 +82,7 @@ export default function RegistrationCodes() {
   };
 
   // =============================================
-  // ✅ ইউনিক কোড জেনারেট ফাংশন
+  // ✅ ইউনিক কোড জেনারেট
   // =============================================
   const generateUniqueCode = () => {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -123,24 +124,26 @@ export default function RegistrationCodes() {
   const getFilteredCodes = () => {
     let filtered = codes;
 
-    // সার্চ
     if (searchTerm) {
-      filtered = filtered.filter(c => 
+      filtered = filtered.filter(c =>
         c.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
         c.used_by?.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
 
-    // ফিল্টার
     const now = new Date();
     if (filter === 'used') {
       filtered = filtered.filter(c => c.is_used === true);
     } else if (filter === 'unused') {
       filtered = filtered.filter(c => c.is_used === false);
     } else if (filter === 'expired') {
-      filtered = filtered.filter(c => 
+      filtered = filtered.filter(c =>
         c.is_used === false && new Date(c.expires_at) < now
       );
+    } else if (filter === 'student') {
+      filtered = filtered.filter(c => c.role === 'student' || !c.role);
+    } else if (filter === 'teacher') {
+      filtered = filtered.filter(c => c.role === 'teacher');
     }
 
     return filtered;
@@ -155,10 +158,23 @@ export default function RegistrationCodes() {
   const used = codes.filter(c => c.is_used).length;
   const unused = codes.filter(c => !c.is_used).length;
   const expired = codes.filter(c => !c.is_used && new Date(c.expires_at) < new Date()).length;
+  const teacherCodes = codes.filter(c => c.role === 'teacher').length;
 
+  // =============================================
+  // ✅ রোল ব্যাজ
+  // =============================================
+  const getRoleBadge = (role) => {
+    if (role === 'teacher') {
+      return { label: '👨‍🏫 শিক্ষক', background: '#fef3c7', color: '#f59e0b' };
+    }
+    return { label: '🎓 ছাত্র', background: '#dbeafe', color: '#2563eb' };
+  };
+
+  // =============================================
+  // ✅ রেন্ডার
+  // =============================================
   return (
     <div style={styles.container}>
-      {/* ✅ পপআপ মেসেজ */}
       {successMessage && (
         <div style={styles.popupSuccess}>
           <span style={styles.popupIcon}>✅</span>
@@ -176,9 +192,9 @@ export default function RegistrationCodes() {
       )}
 
       <h2 style={styles.title}>🔑 রেজিস্ট্রেশন কোড</h2>
-      <p style={styles.subtitle}>ছাত্রদের রেজিস্ট্রেশনের জন্য ইউনিক কোড তৈরি ও ব্যবস্থাপনা করুন</p>
+      <p style={styles.subtitle}>ছাত্র ও শিক্ষকদের রেজিস্ট্রেশনের জন্য ইউনিক কোড তৈরি ও ব্যবস্থাপনা করুন</p>
 
-      {/* ✅ স্ট্যাটিস্টিক্স */}
+      {/* স্ট্যাটিস্টিক্স */}
       <div style={styles.statsGrid}>
         <div style={{ ...styles.statCard, background: 'linear-gradient(135deg, #3b82f6, #2563eb)' }}>
           <div style={styles.statIcon}>📋</div>
@@ -201,18 +217,27 @@ export default function RegistrationCodes() {
             <div style={styles.statLabel}>অব্যবহৃত</div>
           </div>
         </div>
-        <div style={{ ...styles.statCard, background: 'linear-gradient(135deg, #dc2626, #b91c1c)' }}>
-          <div style={styles.statIcon}>⏰</div>
+        <div style={{ ...styles.statCard, background: 'linear-gradient(135deg, #8b5cf6, #7c3aed)' }}>
+          <div style={styles.statIcon}>👨‍🏫</div>
           <div>
-            <div style={styles.statNumber}>{expired}</div>
-            <div style={styles.statLabel}>মেয়াদোত্তীর্ণ</div>
+            <div style={styles.statNumber}>{teacherCodes}</div>
+            <div style={styles.statLabel}>শিক্ষক কোড</div>
           </div>
         </div>
       </div>
 
-      {/* ✅ জেনারেট + ফিল্টার */}
+      {/* জেনারেট + ফিল্টার */}
       <div style={styles.actionBar}>
         <div style={styles.generateSection}>
+          <select
+            value={selectedRole}
+            onChange={(e) => setSelectedRole(e.target.value)}
+            style={styles.roleSelect}
+          >
+            <option value="student">🎓 ছাত্র</option>
+            <option value="teacher">👨‍🏫 শিক্ষক</option>
+          </select>
+
           <input
             type="number"
             min="1"
@@ -221,6 +246,7 @@ export default function RegistrationCodes() {
             onChange={(e) => setBatchSize(Math.min(50, Math.max(1, parseInt(e.target.value) || 1)))}
             style={styles.batchInput}
           />
+
           <button onClick={generateCodes} disabled={generating} style={styles.generateBtn}>
             {generating ? '⏳ জেনারেট হচ্ছে...' : '⚡ কোড জেনারেট'}
           </button>
@@ -239,12 +265,14 @@ export default function RegistrationCodes() {
             <option value="unused">⏳ অব্যবহৃত</option>
             <option value="used">✅ ব্যবহৃত</option>
             <option value="expired">⏰ মেয়াদোত্তীর্ণ</option>
+            <option value="student">🎓 ছাত্র</option>
+            <option value="teacher">👨‍🏫 শিক্ষক</option>
           </select>
           <button onClick={fetchCodes} style={styles.refreshBtn}>🔄</button>
         </div>
       </div>
 
-      {/* ✅ কোড লিস্ট */}
+      {/* কোড লিস্ট */}
       {loading ? (
         <div style={styles.loading}>⏳ লোড হচ্ছে...</div>
       ) : filteredCodes.length === 0 ? (
@@ -259,6 +287,7 @@ export default function RegistrationCodes() {
               <tr>
                 <th style={styles.th}>#</th>
                 <th style={styles.th}>কোড</th>
+                <th style={styles.th}>রোল</th>
                 <th style={styles.th}>স্ট্যাটাস</th>
                 <th style={styles.th}>ব্যবহারকারী</th>
                 <th style={styles.th}>মেয়াদ</th>
@@ -269,12 +298,22 @@ export default function RegistrationCodes() {
             <tbody>
               {filteredCodes.map((code, index) => {
                 const isExpired = !code.is_used && new Date(code.expires_at) < new Date();
+                const roleBadge = getRoleBadge(code.role);
                 return (
                   <tr key={code.id} style={styles.tr}>
                     <td style={styles.td}>{index + 1}</td>
                     <td style={styles.td}>
                       <span style={styles.codeText}>{code.code}</span>
                       <button onClick={() => copyCode(code.code)} style={styles.copyBtn} title="কপি">📋</button>
+                    </td>
+                    <td style={styles.td}>
+                      <span style={{
+                        ...styles.roleBadge,
+                        background: roleBadge.background,
+                        color: roleBadge.color,
+                      }}>
+                        {roleBadge.label}
+                      </span>
                     </td>
                     <td style={styles.td}>
                       <span style={{
@@ -364,6 +403,16 @@ const styles = {
     display: 'flex',
     gap: '10px',
     alignItems: 'center',
+    flexWrap: 'wrap',
+  },
+  roleSelect: {
+    padding: '8px 14px',
+    borderRadius: '10px',
+    border: '1.5px solid #e2e8f0',
+    fontSize: '14px',
+    outline: 'none',
+    background: 'white',
+    minWidth: '120px',
   },
   batchInput: {
     width: '60px',
@@ -408,6 +457,7 @@ const styles = {
     fontSize: '14px',
     outline: 'none',
     background: 'white',
+    minWidth: '150px',
   },
   refreshBtn: {
     padding: '8px 14px',
@@ -430,7 +480,7 @@ const styles = {
     width: '100%',
     borderCollapse: 'collapse',
     fontSize: '14px',
-    minWidth: '700px',
+    minWidth: '800px',
   },
   th: {
     padding: '12px 16px',
@@ -461,6 +511,13 @@ const styles = {
     padding: '2px 6px',
     borderRadius: '4px',
     transition: 'background 0.2s',
+  },
+  roleBadge: {
+    padding: '2px 10px',
+    borderRadius: '12px',
+    fontSize: '11px',
+    fontWeight: '600',
+    display: 'inline-block',
   },
   statusBadge: {
     padding: '4px 12px',
