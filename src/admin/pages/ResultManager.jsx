@@ -16,7 +16,7 @@ export default function ResultManager() {
     marks: '',
     total_marks: 100,
     grade: '',
-    status: 'draft',
+    status: 'published',
   });
   const [searchTerm, setSearchTerm] = useState('');
   const [filterExam, setFilterExam] = useState('all');
@@ -32,7 +32,6 @@ export default function ResultManager() {
   useEffect(() => {
     fetchData();
 
-    // ✅ Realtime subscription
     const resultsChannel = supabase
       .channel('results-realtime')
       .on('postgres_changes', {
@@ -40,7 +39,7 @@ export default function ResultManager() {
         schema: 'public',
         table: 'results',
       }, () => {
-        fetchData(); // রিফ্রেশ ছাড়াই আপডেট
+        fetchData();
       })
       .subscribe();
 
@@ -52,7 +51,6 @@ export default function ResultManager() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      // ১. students লোড
       const { data: studentsData, error: studentsError } = await supabase
         .from('students')
         .select('id, name, class_name, roll_number')
@@ -62,7 +60,6 @@ export default function ResultManager() {
       if (studentsError) throw studentsError;
       setStudents(studentsData || []);
 
-      // ২. results লোড
       const { data: resultsData, error: resultsError } = await supabase
         .from('results')
         .select('*')
@@ -70,7 +67,6 @@ export default function ResultManager() {
 
       if (resultsError) throw resultsError;
 
-      // ৩. ছাত্রের নাম যোগ করা
       const resultsWithNames = (resultsData || []).map(result => {
         const student = studentsData?.find(s => s.id === result.student_id);
         return {
@@ -111,7 +107,6 @@ export default function ResultManager() {
     const { name, value } = e.target;
     setFormData(prev => {
       const newData = { ...prev, [name]: value };
-      // যদি marks পরিবর্তন হয়, grade অটো ক্যালকুলেট
       if (name === 'marks') {
         newData.grade = calculateGrade(value);
       }
@@ -130,7 +125,7 @@ export default function ResultManager() {
         student_id: formData.student_id,
         exam_name: formData.exam_name,
         subject: formData.subject,
-        marks: parseFloat(formData.marks),
+        marks: parseFloat(formData.marks) || 0,
         total_marks: parseFloat(formData.total_marks) || 100,
         grade: formData.grade || calculateGrade(formData.marks),
         status: formData.status || 'published',
@@ -164,10 +159,8 @@ export default function ResultManager() {
         marks: '',
         total_marks: 100,
         grade: '',
-        status: 'draft',
+        status: 'published',
       });
-
-      // রিফ্রেশ ছাড়াই ডেটা আপডেট হবে (Realtime এর মাধ্যমে)
 
     } catch (error) {
       console.error('❌ সংরক্ষণ করতে সমস্যা:', error);
@@ -186,7 +179,7 @@ export default function ResultManager() {
       marks: result.marks || '',
       total_marks: result.total_marks || 100,
       grade: result.grade || '',
-      status: result.status || 'draft',
+      status: result.status || 'published',
     });
     setShowForm(true);
   };
@@ -289,7 +282,7 @@ export default function ResultManager() {
       published: { label: '✅ প্রকাশিত', bg: '#dcfce7', color: '#16a34a' },
       archived: { label: '📦 আর্কাইভ', bg: '#fef3c7', color: '#f59e0b' },
     };
-    return statuses[status] || statuses['draft'];
+    return statuses[status] || statuses['published'];
   };
 
   // =============================================
@@ -344,7 +337,7 @@ export default function ResultManager() {
                 marks: '',
                 total_marks: 100,
                 grade: '',
-                status: 'draft',
+                status: 'published',
               });
             }}
             style={styles.addBtn}
