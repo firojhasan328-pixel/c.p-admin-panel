@@ -24,8 +24,9 @@ import ActivityLogs from './pages/ActivityLogs';
 import RecycleBin from './pages/RecycleBin';
 import RegistrationCodes from './pages/RegistrationCodes';
 import RegistrationRequests from './pages/RegistrationRequests';
-// ✅ নতুন ইমপোর্ট - রেজাল্ট ম্যানেজার
 import ResultManager from './pages/ResultManager';
+// ✅ নতুন ইমপোর্ট - রুটিন ম্যানেজার
+import RoutineManager from './pages/RoutineManager';
 
 // =============================================
 // ✅ প্রোটেক্টেড রাউট (রোল অনুযায়ী চেক)
@@ -81,22 +82,28 @@ export default function AdminApp() {
           <Route path="/seo" element={<ProtectedRoute><SEO /></ProtectedRoute>} />
           <Route path="/media" element={<ProtectedRoute><MediaLibrary /></ProtectedRoute>} />
           
-          {/* ✅ নতুন রাউট: রেজিস্ট্রেশন কোড */}
+          {/* রেজিস্ট্রেশন কোড */}
           <Route 
             path="/registration-codes" 
             element={<ProtectedRoute><RegistrationCodes /></ProtectedRoute>} 
           />
           
-          {/* ✅ নতুন রাউট: ছাত্র অনুরোধ */}
+          {/* ছাত্র অনুরোধ */}
           <Route 
             path="/registration-requests" 
             element={<ProtectedRoute><RegistrationRequests /></ProtectedRoute>} 
           />
           
-          {/* ✅ নতুন রাউট: রেজাল্ট ম্যানেজার */}
+          {/* রেজাল্ট ম্যানেজার */}
           <Route 
             path="/results" 
             element={<ProtectedRoute><ResultManager /></ProtectedRoute>} 
+          />
+
+          {/* ✅ নতুন রাউট: রুটিন ম্যানেজার */}
+          <Route 
+            path="/routines" 
+            element={<ProtectedRoute><RoutineManager /></ProtectedRoute>} 
           />
           
           <Route path="/users" element={<ProtectedRoute requiredRole="super_admin"><Users /></ProtectedRoute>} />
