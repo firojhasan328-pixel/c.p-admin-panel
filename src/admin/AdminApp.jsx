@@ -27,8 +27,9 @@ import RegistrationRequests from './pages/RegistrationRequests';
 import ResultManager from './pages/ResultManager';
 import RoutineManager from './pages/RoutineManager';
 import AssignmentManager from './pages/AssignmentManager';
-// ✅ নতুন ইমপোর্ট - উপস্থিতি ম্যানেজার
 import AttendanceManager from './pages/AttendanceManager';
+// ✅ নতুন ইমপোর্ট - অর্জন ম্যানেজার
+import AchievementManager from './pages/AchievementManager';
 
 // =============================================
 // ✅ প্রোটেক্টেড রাউট (রোল অনুযায়ী চেক)
@@ -109,10 +110,15 @@ export default function AdminApp() {
             element={<ProtectedRoute><AssignmentManager /></ProtectedRoute>} 
           />
 
-          {/* ✅ নতুন রাউট: উপস্থিতি ম্যানেজার */}
           <Route 
             path="/attendance" 
             element={<ProtectedRoute><AttendanceManager /></ProtectedRoute>} 
+          />
+
+          {/* ✅ নতুন রাউট: অর্জন ম্যানেজার */}
+          <Route 
+            path="/achievements" 
+            element={<ProtectedRoute><AchievementManager /></ProtectedRoute>} 
           />
           
           <Route path="/users" element={<ProtectedRoute requiredRole="super_admin"><Users /></ProtectedRoute>} />
