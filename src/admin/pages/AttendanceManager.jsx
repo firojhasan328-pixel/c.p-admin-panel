@@ -106,39 +106,59 @@ export default function AttendanceManager() {
   };
 
   // =============================================
-  // ✅ উপস্থিতি আপডেট
+  // ✅ উপস্থিতি আপডেট (সঠিক সমাধান)
   // =============================================
   const updateAttendance = async (studentId, status) => {
     setSaving(true);
+    setErrorMessage('');
+    setSuccessMessage('');
+
     try {
-      const existing = attendance.find(a => a.id === studentId);
-      
-      if (existing?.attendance_id) {
-        // আপডেট
-        const { error } = await supabase
+      // ১. আগের এন্ট্রি আছে কিনা চেক করো
+      const { data: existing, error: checkError } = await supabase
+        .from('attendance')
+        .select('id, status')
+        .eq('student_id', studentId)
+        .eq('date', selectedDate)
+        .maybeSingle();
+
+      if (checkError) throw checkError;
+
+      let error;
+
+      if (existing) {
+        // ২. আপডেট করো (যদি থাকে)
+        const { error: updateError } = await supabase
           .from('attendance')
-          .update({ status, updated_at: new Date().toISOString() })
-          .eq('id', existing.attendance_id);
-        if (error) throw error;
+          .update({ 
+            status: status,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', existing.id);
+        error = updateError;
       } else {
-        // নতুন
-        const { error } = await supabase
+        // ৩. নতুন এন্ট্রি তৈরি করো (যদি না থাকে)
+        const { error: insertError } = await supabase
           .from('attendance')
           .insert([{
             student_id: studentId,
             date: selectedDate,
             status: status,
           }]);
-        if (error) throw error;
+        error = insertError;
       }
+
+      if (error) throw error;
 
       setSuccessMessage('✅ উপস্থিতি সংরক্ষণ করা হয়েছে!');
       setTimeout(() => setSuccessMessage(''), 3000);
-      fetchData();
+      
+      // ৪. ডেটা রিফ্রেশ করো
+      await fetchData();
 
     } catch (error) {
       console.error('❌ আপডেট করতে সমস্যা:', error);
-      setErrorMessage('❌ আপডেট করতে সমস্যা');
+      setErrorMessage('❌ আপডেট করতে সমস্যা: ' + error.message);
       setTimeout(() => setErrorMessage(''), 3000);
     }
     setSaving(false);
