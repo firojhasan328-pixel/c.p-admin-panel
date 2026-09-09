@@ -32,8 +32,9 @@ const getMenuItems = (role, hasPermission) => {
     { path: '/results', icon: '📊', label: 'রেজাল্ট ম্যানেজার', permission: 'manage_results' },
     { path: '/routines', icon: '📅', label: 'রুটিন ম্যানেজার', permission: 'manage_routines' },
     { path: '/assignments', icon: '📝', label: 'অ্যাসাইনমেন্ট ম্যানেজার', permission: 'manage_assignments' },
-    // ✅ নতুন মেনু: উপস্থিতি ম্যানেজার
     { path: '/attendance', icon: '📈', label: 'উপস্থিতি ম্যানেজার', permission: 'manage_attendance' },
+    // ✅ নতুন মেনু: অর্জন ম্যানেজার
+    { path: '/achievements', icon: '🏆', label: 'অর্জন ম্যানেজার', permission: 'manage_achievements' },
   ];
 
   // শুধু সুপার অ্যাডমিন দেখতে পারে
