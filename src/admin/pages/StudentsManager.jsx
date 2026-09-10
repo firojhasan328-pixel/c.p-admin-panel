@@ -1,592 +1,476 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../supabaseClient';
-import { useAdmin } from '../../context/AdminContext';
-import { usePermissions } from '../../hooks/usePermissions';
-import TeacherPermissionsModal from '../components/TeacherPermissionsModal';
 
-export default function TeachersManager() {
-  const { adminUser } = useAdmin();
-  const { hasPermission, canGrantPermission } = usePermissions();
-  const [teachers, setTeachers] = useState([]);
-  const [pendingTeachers, setPendingTeachers] = useState([]);
+export default function StudentsManager() {
+  const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('approved'); // 'approved' | 'pending'
+  const [selectedClass, setSelectedClass] = useState('all');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedStudents, setSelectedStudents] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
   const [formData, setFormData] = useState({
     name: '',
-    designation: '',
-    subject: '',
+    class_name: '',
+    roll_number: '',
+    father_name: '',
+    mother_name: '',
     phone: '',
     email: '',
     photo_url: '',
   });
-  const [selectedTeacher, setSelectedTeacher] = useState(null);
-  const [showPermissionsModal, setShowPermissionsModal] = useState(false);
-  const [teacherRoles, setTeacherRoles] = useState({});
   const [actionLoading, setActionLoading] = useState(false);
-  const [successMessage, setSuccessMessage] = useState('');
-  const [errorMessage, setErrorMessage] = useState('');
 
-  const canManageTeachers = hasPermission('manage_teachers');
-  const canManagePermissions = hasPermission('manage_permissions');
+  // ✅ ক্লাস লিস্ট
+  const classList = ['প্লে', '১ম', '২য়', '৩য়', '৪র্থ', '৫ম'];
 
   useEffect(() => {
-    if (canManageTeachers) {
-      fetchAllData();
-      fetchAllRoles();
+    fetchStudents();
+  }, []);
 
-      // ✅ Realtime subscription — শিক্ষক ও রেজিস্ট্রেশন অনুরোধ উভয়ের জন্যই
-      const teacherChannel = supabase
-        .channel('teachers-realtime')
-        .on('postgres_changes', {
-          event: '*',
-          schema: 'public',
-          table: 'teachers',
-        }, () => {
-          fetchAllData();
-        })
-        .subscribe();
-
-      const requestChannel = supabase
-        .channel('teacher-requests-realtime')
-        .on('postgres_changes', {
-          event: '*',
-          schema: 'public',
-          table: 'registration_requests',
-        }, () => {
-          fetchAllData();
-        })
-        .subscribe();
-
-      return () => {
-        supabase.removeChannel(teacherChannel);
-        supabase.removeChannel(requestChannel);
-      };
-    }
-  }, [canManageTeachers]);
-
-  // =============================================
-  // ✅ সব ডেটা লোড (approved teachers + pending requests)
-  // =============================================
-  const fetchAllData = async () => {
+  const fetchStudents = async () => {
     setLoading(true);
     try {
-      // ✅ শুধু approved শিক্ষক
-      const { data: approvedData, error: approvedError } = await supabase
-        .from('teachers')
+      const { data, error } = await supabase
+        .from('students')
         .select('*')
-        .eq('is_approved', true)
-        .order('name');
+        .order('class_name')
+        .order('roll_number');
 
-      if (approvedError) throw approvedError;
-      setTeachers(approvedData || []);
-
-      // ✅ Pending শিক্ষক রেজিস্ট্রেশন অনুরোধ
-      const { data: pendingData, error: pendingError } = await supabase
-        .from('registration_requests')
-        .select('*')
-        .eq('role', 'teacher')
-        .eq('status', 'pending')
-        .order('created_at', { ascending: false });
-
-      if (pendingError) throw pendingError;
-      setPendingTeachers(pendingData || []);
-
+      if (error) throw error;
+      setStudents(data || []);
     } catch (error) {
-      console.error('❌ ডেটা লোড করতে সমস্যা:', error);
-      setErrorMessage('❌ ডেটা লোড করতে সমস্যা');
-      setTimeout(() => setErrorMessage(''), 3000);
+      console.error('Fetch error:', error);
     }
     setLoading(false);
   };
 
   // =============================================
-  // ✅ সব শিক্ষকের রোল লোড করুন
+  // ✅ ফিল্টার করা ডেটা
   // =============================================
-  const fetchAllRoles = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('admin_users')
-        .select('email, role');
+  const filteredData = students.filter(student => {
+    const matchesClass = selectedClass === 'all' || student.class_name === selectedClass;
+    const matchesSearch = 
+      student.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      student.roll_number?.toString().includes(searchTerm) ||
+      student.phone?.includes(searchTerm);
+    return matchesClass && matchesSearch;
+  });
 
-      if (data) {
-        const roleMap = {};
-        data.forEach(item => {
-          roleMap[item.email] = item.role;
-        });
-        setTeacherRoles(roleMap);
-        console.log('✅ Roles loaded:', roleMap);
-      }
-    } catch (error) {
-      console.error('❌ Fetch roles error:', error);
+  // =============================================
+  // ✅ ক্লাস অনুযায়ী কাউন্ট
+  // =============================================
+  const getClassCount = (className) => {
+    if (className === 'all') return students.length;
+    return students.filter(s => s.class_name === className).length;
+  };
+
+  // =============================================
+  // ✅ সিলেক্ট/ডি-সিলেক্ট
+  // =============================================
+  const toggleSelect = (id) => {
+    setSelectedStudents(prev =>
+      prev.includes(id) ? prev.filter(sid => sid !== id) : [...prev, id]
+    );
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedStudents.length === filteredData.length) {
+      setSelectedStudents([]);
+    } else {
+      setSelectedStudents(filteredData.map(s => s.id));
     }
   };
 
+  // =============================================
+  // ✅ বাল্ক ডিলিট
+  // =============================================
+  const bulkDelete = async () => {
+    if (selectedStudents.length === 0) {
+      alert('⚠️ দয়া করে অন্তত একটি ছাত্র সিলেক্ট করুন!');
+      return;
+    }
+    if (!confirm(`${selectedStudents.length} জন ছাত্র ডিলিট করতে চান?`)) return;
+
+    setActionLoading(true);
+    try {
+      const { error } = await supabase
+        .from('students')
+        .delete()
+        .in('id', selectedStudents);
+
+      if (error) throw error;
+      setSelectedStudents([]);
+      await fetchStudents();
+      alert(`✅ ${selectedStudents.length} জন ছাত্র ডিলিট করা হয়েছে!`);
+    } catch (error) {
+      console.error('Bulk delete error:', error);
+      alert('❌ ডিলিট করতে সমস্যা');
+    }
+    setActionLoading(false);
+  };
+
+  // =============================================
+  // ✅ এক্সপোর্ট CSV
+  // =============================================
+  const exportCSV = () => {
+    if (filteredData.length === 0) {
+      alert('⚠️ কোনো ছাত্র নেই!');
+      return;
+    }
+
+    const headers = ['নাম', 'ক্লাস', 'রোল', 'বাবার নাম', 'মায়ের নাম', 'ফোন', 'ইমেইল'];
+    const rows = filteredData.map(s => [
+      s.name, s.class_name, s.roll_number || '', s.father_name || '',
+      s.mother_name || '', s.phone || '', s.email || ''
+    ]);
+
+    const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `ছাত্র_তালিকা_${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // =============================================
+  // ✅ ফর্ম হ্যান্ডেল
+  // =============================================
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!canManageTeachers) {
-      alert('আপনার শিক্ষক যোগ করার অনুমতি নেই');
-      return;
-    }
     setActionLoading(true);
     try {
       if (editing) {
-        await supabase.from('teachers').update(formData).eq('id', editing);
+        await supabase.from('students').update(formData).eq('id', editing);
       } else {
-        await supabase.from('teachers').insert([{ ...formData, is_approved: true }]);
+        await supabase.from('students').insert([formData]);
       }
       setShowForm(false);
       setEditing(null);
-      setFormData({ name: '', designation: '', subject: '', phone: '', email: '', photo_url: '' });
-      await fetchAllData();
-      setSuccessMessage(editing ? '✅ শিক্ষক আপডেট করা হয়েছে!' : '✅ শিক্ষক যোগ করা হয়েছে!');
-      setTimeout(() => setSuccessMessage(''), 3000);
+      setFormData({ name: '', class_name: '', roll_number: '', father_name: '', mother_name: '', phone: '', email: '', photo_url: '' });
+      await fetchStudents();
+      alert(editing ? '✅ ছাত্র আপডেট করা হয়েছে!' : '✅ ছাত্র যোগ করা হয়েছে!');
     } catch (error) {
       console.error('Save error:', error);
-      setErrorMessage('❌ সংরক্ষণ করতে সমস্যা');
-      setTimeout(() => setErrorMessage(''), 3000);
+      alert('❌ সংরক্ষণ করতে সমস্যা');
     }
     setActionLoading(false);
   };
 
-  const handleEdit = (teacher) => {
-    if (!canManageTeachers) {
-      alert('আপনার শিক্ষক এডিট করার অনুমতি নেই');
-      return;
-    }
-    setEditing(teacher.id);
-    setFormData(teacher);
+  const handleEdit = (student) => {
+    setEditing(student.id);
+    setFormData(student);
     setShowForm(true);
   };
 
   const handleDelete = async (id) => {
-    if (!canManageTeachers) {
-      alert('আপনার শিক্ষক ডিলিট করার অনুমতি নেই');
-      return;
-    }
-    if (confirm('নিশ্চিতভাবে ডিলিট করতে চান?')) {
-      setActionLoading(true);
-      try {
-        await supabase.from('teachers').delete().eq('id', id);
-        await fetchAllData();
-        setSuccessMessage('✅ শিক্ষক ডিলিট করা হয়েছে!');
-        setTimeout(() => setSuccessMessage(''), 3000);
-      } catch (error) {
-        console.error('Delete error:', error);
-        setErrorMessage('❌ ডিলিট করতে সমস্যা');
-        setTimeout(() => setErrorMessage(''), 3000);
-      }
-      setActionLoading(false);
-    }
-  };
-
-  // =============================================
-  // ✅ Pending শিক্ষক Approve
-  // =============================================
-  const handleApprove = async (request) => {
-    if (!confirm(`"${request.student_name}"-কে শিক্ষক হিসেবে অনুমোদন দিতে চান?`)) return;
-
+    if (!confirm('এই ছাত্র ডিলিট করতে চান?')) return;
     setActionLoading(true);
-    setErrorMessage('');
-    setSuccessMessage('');
-
     try {
-      // ১. registration_requests আপডেট
-      const { error: updateError } = await supabase
-        .from('registration_requests')
-        .update({
-          status: 'approved',
-          approved_at: new Date().toISOString(),
-          approved_by: adminUser?.email || 'admin',
-        })
-        .eq('id', request.id);
-
-      if (updateError) throw updateError;
-
-      // ২. teachers টেবিলে update (existing ID দিয়ে)
-      const teacherData = {
-        name: request.student_name,
-        designation: request.designation || 'শিক্ষক',
-        subject: request.subject || '—',
-        gender: request.gender || null,
-        phone: request.phone,
-        email: request.email,
-        photo_url: request.student_photo || null,
-        is_approved: true,
-        is_verified: true,
-      };
-
-      // ইমেইল দিয়ে existing চেক
-      const { data: existingTeacher } = await supabase
-        .from('teachers')
-        .select('id')
-        .eq('email', request.email)
-        .maybeSingle();
-
-      if (existingTeacher) {
-        // আপডেট
-        await supabase
-          .from('teachers')
-          .update(teacherData)
-          .eq('id', existingTeacher.id);
-      } else {
-        // নতুন insert
-        await supabase
-          .from('teachers')
-          .insert([teacherData]);
-      }
-
-      // ৩. registration_codes আপডেট
-      await supabase
-        .from('registration_codes')
-        .update({
-          is_used: true,
-          used_by: request.email,
-          used_at: new Date().toISOString(),
-        })
-        .eq('code', request.code);
-
-      // ৪. লগ তৈরি
-      await supabase
-        .from('registration_logs')
-        .insert([{
-          code: request.code,
-          action: 'teacher_approved',
-          email: request.email,
-          role: 'teacher',
-        }]);
-
-      setSuccessMessage(`✅ "${request.student_name}"-কে অনুমোদন দেওয়া হয়েছে!`);
-      await fetchAllData();
-      setTimeout(() => setSuccessMessage(''), 5000);
-
+      await supabase.from('students').delete().eq('id', id);
+      await fetchStudents();
+      alert('✅ ছাত্র ডিলিট করা হয়েছে!');
     } catch (error) {
-      console.error('Approve error:', error);
-      setErrorMessage('❌ অনুমোদন করতে সমস্যা: ' + error.message);
-      setTimeout(() => setErrorMessage(''), 5000);
+      console.error('Delete error:', error);
+      alert('❌ ডিলিট করতে সমস্যা');
     }
     setActionLoading(false);
   };
 
   // =============================================
-  // ✅ Pending শিক্ষক Reject
+  // ✅ রেন্ডার
   // =============================================
-  const handleReject = async (request) => {
-    if (!confirm(`"${request.student_name}"-এর অনুরোধ বাতিল করতে চান?`)) return;
-
-    setActionLoading(true);
-    try {
-      await supabase
-        .from('registration_requests')
-        .update({
-          status: 'rejected',
-          rejected_at: new Date().toISOString(),
-          rejected_by: adminUser?.email || 'admin',
-        })
-        .eq('id', request.id);
-
-      await supabase
-        .from('registration_logs')
-        .insert([{
-          code: request.code,
-          action: 'teacher_rejected',
-          email: request.email,
-          role: 'teacher',
-        }]);
-
-      setSuccessMessage(`❌ "${request.student_name}"-এর অনুরোধ বাতিল করা হয়েছে!`);
-      await fetchAllData();
-      setTimeout(() => setSuccessMessage(''), 5000);
-
-    } catch (error) {
-      console.error('Reject error:', error);
-      setErrorMessage('❌ বাতিল করতে সমস্যা');
-      setTimeout(() => setErrorMessage(''), 5000);
-    }
-    setActionLoading(false);
-  };
-
-  const handlePermissionsClick = (teacher) => {
-    if (!canManagePermissions) {
-      alert('আপনার পারমিশন পরিবর্তনের অনুমতি নেই');
-      return;
-    }
-    setSelectedTeacher(teacher);
-    setShowPermissionsModal(true);
-  };
-
-  // =============================================
-  // ✅ রোল ব্যাজ
-  // =============================================
-  const getRoleBadge = (email) => {
-    const role = teacherRoles[email];
-    if (!role) return null;
-    
-    const badges = {
-      super_admin: { 
-        label: '⭐ সুপার অ্যাডমিন', 
-        bg: '#dcfce7', 
-        color: '#16a34a',
-        border: '2px solid #16a34a'
-      },
-      admin: { 
-        label: '🔹 সাব অ্যাডমিন', 
-        bg: '#dbeafe', 
-        color: '#2563eb',
-        border: '2px solid #2563eb'
-      },
-      teacher: { 
-        label: '👨‍🏫 শিক্ষক', 
-        bg: '#fef3c7', 
-        color: '#f59e0b',
-        border: '2px solid #f59e0b'
-      },
-      viewer: { 
-        label: '👁️ দর্শক', 
-        bg: '#f1f5f9', 
-        color: '#64748b',
-        border: '2px solid #64748b'
-      }
-    };
-    
-    return badges[role] || null;
-  };
-
-  if (!canManageTeachers) {
-    return (
-      <div style={styles.noAccess}>
-        <span style={styles.noAccessIcon}>🔒</span>
-        <h3 style={styles.noAccessTitle}>অ্যাক্সেস নেই</h3>
-        <p style={styles.noAccessText}>আপনার শিক্ষক ব্যবস্থাপনা দেখার অনুমতি নেই</p>
-      </div>
-    );
-  }
-
   return (
     <div style={styles.container}>
-      {/* পপআপ মেসেজ */}
-      {successMessage && (
-        <div style={styles.popupSuccess}>
-          <span>✅</span> {successMessage}
-          <button onClick={() => setSuccessMessage('')} style={styles.popupClose}>✕</button>
-        </div>
-      )}
-      {errorMessage && (
-        <div style={styles.popupError}>
-          <span>⚠️</span> {errorMessage}
-          <button onClick={() => setErrorMessage('')} style={styles.popupClose}>✕</button>
-        </div>
-      )}
-
+      {/* ✅ হেডার */}
       <div style={styles.header}>
-        <h2 style={styles.title}>👨‍🏫 শিক্ষক ব্যবস্থাপনা</h2>
-        <button 
-          onClick={() => { setShowForm(true); setEditing(null); setFormData({ name: '', designation: '', subject: '', phone: '', email: '', photo_url: '' }); }} 
-          style={styles.addBtn}
-        >
-          ➕ নতুন শিক্ষক
-        </button>
+        <h2 style={styles.title}>🎓 ছাত্র ব্যবস্থাপনা</h2>
+        <div style={styles.headerActions}>
+          <button onClick={() => { setShowForm(true); setEditing(null); setFormData({ name: '', class_name: '', roll_number: '', father_name: '', mother_name: '', phone: '', email: '', photo_url: '' }); }} style={styles.addBtn}>
+            ➕ নতুন ছাত্র
+          </button>
+          <button onClick={exportCSV} style={styles.exportBtn}>📥 CSV এক্সপোর্ট</button>
+          {selectedStudents.length > 0 && (
+            <button onClick={bulkDelete} disabled={actionLoading} style={styles.bulkDeleteBtn}>
+              🗑️ {selectedStudents.length} টি ডিলিট
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* ✅ ট্যাব সিস্টেম */}
-      <div style={styles.tabContainer}>
-        <button
-          onClick={() => setActiveTab('approved')}
-          style={{ ...styles.tab, ...(activeTab === 'approved' ? styles.tabActive : {}) }}
-        >
-          ✅ অনুমোদিত শিক্ষক <span style={styles.tabBadge}>{teachers.length}</span>
-        </button>
-        <button
-          onClick={() => setActiveTab('pending')}
-          style={{ ...styles.tab, ...(activeTab === 'pending' ? styles.tabActive : {}) }}
-        >
-          ⏳ অনুমোদনের অপেক্ষায় <span style={styles.tabBadge}>{pendingTeachers.length}</span>
-        </button>
-      </div>
-
+      {/* ✅ ফর্ম */}
       {showForm && (
         <form onSubmit={handleSubmit} style={styles.form}>
-          <input name="name" value={formData.name} onChange={handleChange} placeholder="নাম" style={styles.input} required />
-          <input name="designation" value={formData.designation} onChange={handleChange} placeholder="পদবী" style={styles.input} />
-          <input name="subject" value={formData.subject} onChange={handleChange} placeholder="বিষয়" style={styles.input} />
-          <input name="phone" value={formData.phone} onChange={handleChange} placeholder="ফোন" style={styles.input} />
-          <input name="email" value={formData.email} onChange={handleChange} placeholder="ইমেইল" style={styles.input} />
-          <input name="photo_url" value={formData.photo_url} onChange={handleChange} placeholder="ছবি URL" style={styles.input} />
+          <div style={styles.formGrid}>
+            <input name="name" value={formData.name} onChange={handleChange} placeholder="নাম" style={styles.input} required />
+            <select name="class_name" value={formData.class_name} onChange={handleChange} style={styles.input} required>
+              <option value="">ক্লাস নির্বাচন</option>
+              {classList.map(cls => <option key={cls} value={cls}>{cls}</option>)}
+            </select>
+            <input name="roll_number" value={formData.roll_number} onChange={handleChange} placeholder="রোল নম্বর" style={styles.input} />
+            <input name="father_name" value={formData.father_name} onChange={handleChange} placeholder="বাবার নাম" style={styles.input} />
+            <input name="mother_name" value={formData.mother_name} onChange={handleChange} placeholder="মায়ের নাম" style={styles.input} />
+            <input name="phone" value={formData.phone} onChange={handleChange} placeholder="ফোন" style={styles.input} />
+            <input name="email" value={formData.email} onChange={handleChange} placeholder="ইমেইল" style={styles.input} />
+            <input name="photo_url" value={formData.photo_url} onChange={handleChange} placeholder="ছবি URL" style={styles.input} />
+          </div>
           <div style={styles.formActions}>
-            <button type="submit" disabled={actionLoading} style={styles.saveBtn}>{editing ? 'আপডেট' : 'যোগ করুন'}</button>
+            <button type="submit" disabled={actionLoading} style={styles.saveBtn}>
+              {actionLoading ? '⏳ সংরক্ষণ...' : '💾 সংরক্ষণ করুন'}
+            </button>
             <button type="button" onClick={() => setShowForm(false)} style={styles.cancelBtn}>বাতিল</button>
           </div>
         </form>
       )}
 
+      {/* ✅ মোট ছাত্র + সার্চ */}
+      <div style={styles.statsBar}>
+        <span style={styles.totalCount}>👥 মোট ছাত্র: {students.length} জন</span>
+        <input
+          type="text"
+          placeholder="🔍 নাম, রোল বা ফোন দিয়ে খুঁজুন..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          style={styles.searchInput}
+        />
+      </div>
+
+      {/* ✅ ক্লাস ট্যাব */}
+      <div style={styles.tabContainer}>
+        <button
+          onClick={() => setSelectedClass('all')}
+          style={{ ...styles.tab, ...(selectedClass === 'all' ? styles.tabActive : {}) }}
+        >
+          সব <span style={styles.tabBadge}>{getClassCount('all')}</span>
+        </button>
+        {classList.map(cls => (
+          <button
+            key={cls}
+            onClick={() => setSelectedClass(cls)}
+            style={{ ...styles.tab, ...(selectedClass === cls ? styles.tabActive : {}) }}
+          >
+            {cls} <span style={styles.tabBadge}>{getClassCount(cls)}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* ✅ টেবিল */}
       {loading ? (
-        <div style={styles.loadingContainer}>
-          <div style={styles.loadingSpinner}></div>
-          <p>⏳ লোড হচ্ছে...</p>
+        <div style={styles.loading}>⏳ লোড হচ্ছে...</div>
+      ) : filteredData.length === 0 ? (
+        <div style={styles.emptyState}>
+          <span style={styles.emptyIcon}>📭</span>
+          <p>এই ক্লাসে কোনো ছাত্র নেই</p>
         </div>
       ) : (
-        <>
-          {/* ✅ Approved Teachers ট্যাব */}
-          {activeTab === 'approved' && (
-            <>
-              {teachers.length === 0 ? (
-                <div style={styles.emptyState}>
-                  <span style={styles.emptyIcon}>📭</span>
-                  <p>কোনো অনুমোদিত শিক্ষক নেই</p>
-                </div>
-              ) : (
-                <div style={styles.list}>
-                  {teachers.map((t) => {
-                    const roleBadge = getRoleBadge(t.email);
-                    return (
-                      <div key={t.id} style={styles.item}>
-                        <div style={styles.itemLeft}>
-                          <strong style={styles.teacherName}>{t.name}</strong>
-                          {roleBadge && (
-                            <span style={{
-                              ...styles.roleBadge,
-                              background: roleBadge.bg,
-                              color: roleBadge.color,
-                              border: roleBadge.border,
-                            }}>
-                              {roleBadge.label}
-                            </span>
-                          )}
-                          <span style={styles.badge}>{t.designation || 'শিক্ষক'}</span>
-                          <span style={styles.badge2}>{t.subject}</span>
-                        </div>
-                        <div style={styles.actions}>
-                          <button onClick={() => handleEdit(t)} style={styles.editBtn} title="এডিট">✏️</button>
-                          {canManagePermissions && (
-                            <button 
-                              onClick={() => handlePermissionsClick(t)} 
-                              style={styles.permissionBtn} 
-                              title="পারমিশন সেটিংস"
-                            >
-                              ⚙️
-                            </button>
-                          )}
-                          <button onClick={() => handleDelete(t.id)} style={styles.deleteBtn} title="ডিলিট">🗑️</button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </>
-          )}
-
-          {/* ✅ Pending Teachers ট্যাব */}
-          {activeTab === 'pending' && (
-            <>
-              {pendingTeachers.length === 0 ? (
-                <div style={styles.emptyState}>
-                  <span style={styles.emptyIcon}>✅</span>
-                  <p>কোনো pending শিক্ষক অনুরোধ নেই</p>
-                </div>
-              ) : (
-                <div style={styles.list}>
-                  {pendingTeachers.map((p) => (
-                    <div key={p.id} style={styles.pendingItem}>
-                      <div style={styles.pendingLeft}>
-                        <div style={styles.pendingAvatar}>
-                          {p.student_photo ? (
-                            <img src={p.student_photo} alt={p.student_name} style={styles.pendingAvatarImg} />
-                          ) : (
-                            <span style={styles.pendingAvatarText}>{p.student_name?.charAt(0) || '?'}</span>
-                          )}
-                        </div>
-                        <div style={styles.pendingInfo}>
-                          <div style={styles.pendingName}>{p.student_name}</div>
-                          <div style={styles.pendingMeta}>
-                            <span>💼 {p.designation || 'শিক্ষক'}</span>
-                            <span>📚 {p.subject || '—'}</span>
-                          </div>
-                          <div style={styles.pendingMeta}>
-                            <span>📧 {p.email}</span>
-                            <span>📱 {p.phone}</span>
-                          </div>
-                          <div style={styles.pendingDate}>
-                            📅 {new Date(p.created_at).toLocaleDateString('bn-BD')}
-                          </div>
-                        </div>
-                      </div>
-                      <div style={styles.actions}>
-                        <button 
-                          onClick={() => handleApprove(p)} 
-                          disabled={actionLoading}
-                          style={styles.approveBtn}
-                          title="অনুমোদন"
-                        >
-                          ✅
-                        </button>
-                        <button 
-                          onClick={() => handleReject(p)} 
-                          disabled={actionLoading}
-                          style={styles.rejectBtn}
-                          title="বাতিল"
-                        >
-                          ❌
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </>
-          )}
-        </>
+        <div style={styles.tableWrapper}>
+          <table style={styles.table}>
+            <thead>
+              <tr>
+                <th style={styles.th}>
+                  <input
+                    type="checkbox"
+                    checked={selectedStudents.length === filteredData.length && filteredData.length > 0}
+                    onChange={toggleSelectAll}
+                    style={styles.checkbox}
+                  />
+                </th>
+                <th style={styles.th}>ছবি</th>
+                <th style={styles.th}>নাম</th>
+                <th style={styles.th}>ক্লাস</th>
+                <th style={styles.th}>রোল</th>
+                <th style={styles.th}>ফোন</th>
+                <th style={styles.th}>ইমেইল</th>
+                <th style={styles.th}>অ্যাকশন</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredData.map((student) => (
+                <tr key={student.id} style={styles.tr}>
+                  <td style={styles.td}>
+                    <input
+                      type="checkbox"
+                      checked={selectedStudents.includes(student.id)}
+                      onChange={() => toggleSelect(student.id)}
+                      style={styles.checkbox}
+                    />
+                  </td>
+                  <td style={styles.td}>
+                    {student.photo_url ? (
+                      <img src={student.photo_url} alt={student.name} style={styles.avatar} />
+                    ) : (
+                      <div style={styles.avatarPlaceholder}>{student.name?.charAt(0) || '?'}</div>
+                    )}
+                  </td>
+                  <td style={styles.td}><strong>{student.name}</strong></td>
+                  <td style={styles.td}><span style={styles.classBadge}>{student.class_name}</span></td>
+                  <td style={styles.td}>{student.roll_number || '—'}</td>
+                  <td style={styles.td}>{student.phone || '—'}</td>
+                  <td style={styles.td}>{student.email || '—'}</td>
+                  <td style={styles.td}>
+                    <button onClick={() => handleEdit(student)} style={styles.editBtn} title="এডিট">✏️</button>
+                    <button onClick={() => handleDelete(student.id)} style={styles.deleteBtn} title="ডিলিট">🗑️</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
-
-      <TeacherPermissionsModal
-        teacher={selectedTeacher}
-        isOpen={showPermissionsModal}
-        onClose={() => {
-          setShowPermissionsModal(false);
-          setSelectedTeacher(null);
-        }}
-        onSuccess={() => {
-          fetchAllData();
-          fetchAllRoles();
-        }}
-      />
     </div>
   );
 }
 
+// =============================================
+// 🎨 প্রিমিয়াম রেসপনসিভ স্টাইল
+// =============================================
 const styles = {
-  container: { maxWidth: '900px', margin: '0 auto' },
-  noAccess: {
-    textAlign: 'center',
-    padding: '60px 20px',
-    background: 'white',
-    borderRadius: '16px',
+  container: {
+    maxWidth: '1200px',
+    margin: '0 auto',
+    padding: '0 16px',
+    fontFamily: "'Hind Siliguri', sans-serif",
+    width: '100%',
+    boxSizing: 'border-box',
+  },
+  header: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: '12px',
+    marginBottom: '20px',
+  },
+  title: {
+    fontSize: 'clamp(20px, 4vw, 26px)',
+    fontWeight: '700',
+    color: '#0f172a',
+    margin: 0,
+  },
+  headerActions: {
+    display: 'flex',
+    gap: '10px',
+    flexWrap: 'wrap',
+  },
+  addBtn: {
+    background: 'linear-gradient(135deg, #16a34a, #15803d)',
+    color: 'white',
+    border: 'none',
+    padding: '10px 18px',
+    borderRadius: '10px',
+    fontWeight: '600',
+    cursor: 'pointer',
+    fontSize: '14px',
+    whiteSpace: 'nowrap',
+  },
+  exportBtn: {
+    background: '#2563eb',
+    color: 'white',
+    border: 'none',
+    padding: '10px 18px',
+    borderRadius: '10px',
+    fontWeight: '600',
+    cursor: 'pointer',
+    fontSize: '14px',
+    whiteSpace: 'nowrap',
+  },
+  bulkDeleteBtn: {
+    background: '#dc2626',
+    color: 'white',
+    border: 'none',
+    padding: '10px 18px',
+    borderRadius: '10px',
+    fontWeight: '600',
+    cursor: 'pointer',
+    fontSize: '14px',
+    whiteSpace: 'nowrap',
+  },
+  form: {
+    background: '#f8fafc',
+    padding: '20px',
+    borderRadius: '12px',
+    marginBottom: '20px',
     border: '1px solid #e2e8f0',
   },
-  noAccessIcon: { fontSize: '48px', display: 'block', marginBottom: '12px' },
-  noAccessTitle: { fontSize: '20px', color: '#0f172a', margin: '0 0 8px 0' },
-  noAccessText: { fontSize: '14px', color: '#64748b', margin: 0 },
-  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '10px' },
-  title: { fontSize: '22px', fontWeight: '700', color: '#0f172a', margin: 0 },
-  addBtn: { background: '#16a34a', color: 'white', border: 'none', padding: '10px 18px', borderRadius: '10px', fontWeight: '600', cursor: 'pointer' },
-  
-  // ✅ ট্যাব
+  formGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+    gap: '12px',
+    marginBottom: '12px',
+  },
+  input: {
+    padding: '10px 14px',
+    borderRadius: '10px',
+    border: '1.5px solid #e2e8f0',
+    fontSize: '14px',
+    outline: 'none',
+    backgroundColor: 'white',
+  },
+  formActions: {
+    display: 'flex',
+    gap: '10px',
+  },
+  saveBtn: {
+    background: '#16a34a',
+    color: 'white',
+    border: 'none',
+    padding: '10px 24px',
+    borderRadius: '10px',
+    fontWeight: '600',
+    cursor: 'pointer',
+  },
+  cancelBtn: {
+    background: '#64748b',
+    color: 'white',
+    border: 'none',
+    padding: '10px 24px',
+    borderRadius: '10px',
+    fontWeight: '600',
+    cursor: 'pointer',
+  },
+  statsBar: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: '12px',
+    marginBottom: '16px',
+    padding: '12px 16px',
+    background: 'white',
+    borderRadius: '12px',
+    border: '1px solid #e2e8f0',
+  },
+  totalCount: {
+    fontSize: '16px',
+    fontWeight: '700',
+    color: '#0f172a',
+  },
+  searchInput: {
+    flex: '1 1 200px',
+    padding: '8px 14px',
+    borderRadius: '10px',
+    border: '1.5px solid #e2e8f0',
+    fontSize: '14px',
+    outline: 'none',
+    minWidth: '140px',
+  },
   tabContainer: {
     display: 'flex',
     gap: '8px',
+    flexWrap: 'wrap',
     marginBottom: '20px',
     padding: '8px',
     background: '#f1f5f9',
     borderRadius: '12px',
   },
   tab: {
-    flex: 1,
-    padding: '10px 16px',
+    padding: '8px 16px',
     borderRadius: '8px',
     border: 'none',
     background: 'transparent',
@@ -597,8 +481,7 @@ const styles = {
     transition: 'all 0.2s ease',
     display: 'flex',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: '8px',
+    gap: '6px',
   },
   tabActive: {
     background: 'white',
@@ -610,215 +493,119 @@ const styles = {
     padding: '0 8px',
     borderRadius: '12px',
     fontSize: '12px',
-    fontWeight: '700',
+    fontWeight: '600',
     color: '#475569',
-    minWidth: '24px',
-    textAlign: 'center',
   },
-
-  form: { background: '#f8fafc', padding: '20px', borderRadius: '12px', marginBottom: '20px', display: 'flex', flexDirection: 'column', gap: '10px' },
-  input: { padding: '10px 14px', borderRadius: '10px', border: '1.5px solid #e2e8f0', fontSize: '14px', outline: 'none' },
-  formActions: { display: 'flex', gap: '10px' },
-  saveBtn: { background: '#16a34a', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '10px', fontWeight: '600', cursor: 'pointer' },
-  cancelBtn: { background: '#64748b', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '10px', fontWeight: '600', cursor: 'pointer' },
-  
-  loadingContainer: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    padding: '60px 0',
-    gap: '16px',
-  },
-  loadingSpinner: {
-    width: '40px',
-    height: '40px',
-    border: '4px solid #e2e8f0',
-    borderTop: '4px solid #16a34a',
-    borderRadius: '50%',
-    animation: 'spin 1s linear infinite',
-  },
-  
+  loading: { textAlign: 'center', padding: '40px 0', color: '#94a3b8' },
   emptyState: { textAlign: 'center', padding: '50px 0', color: '#94a3b8' },
   emptyIcon: { fontSize: '56px', display: 'block', marginBottom: '12px' },
-  
-  list: { display: 'flex', flexDirection: 'column', gap: '8px' },
-  item: { 
-    display: 'flex', 
-    justifyContent: 'space-between', 
-    alignItems: 'center', 
-    padding: '12px 16px', 
-    background: 'white', 
-    borderRadius: '10px', 
-    border: '1px solid #e2e8f0', 
-    flexWrap: 'wrap', 
-    gap: '8px',
+  tableWrapper: {
+    overflowX: 'auto',
+    background: 'white',
+    borderRadius: '14px',
+    border: '1px solid #e2e8f0',
+    WebkitOverflowScrolling: 'touch',
   },
-  itemLeft: { 
-    display: 'flex', 
-    alignItems: 'center', 
-    gap: '10px', 
-    flexWrap: 'wrap',
-    flex: 1,
+  table: {
+    width: '100%',
+    borderCollapse: 'collapse',
+    fontSize: 'clamp(13px, 1.4vw, 15px)',
+    minWidth: '700px',
   },
-  teacherName: { 
-    fontSize: '15px', 
-    fontWeight: '600', 
-    color: '#0f172a',
-  },
-  roleBadge: {
-    padding: '2px 12px',
-    borderRadius: '20px',
-    fontSize: '11px',
+  th: {
+    padding: '12px 16px',
+    textAlign: 'left',
+    background: '#f8fafc',
     fontWeight: '700',
+    color: '#334155',
+    borderBottom: '2px solid #e2e8f0',
+    whiteSpace: 'nowrap',
+    fontSize: '12px',
+    textTransform: 'uppercase',
     letterSpacing: '0.3px',
   },
-  badge: { background: '#dbeafe', color: '#2563eb', padding: '2px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: '600' },
-  badge2: { background: '#dcfce7', color: '#16a34a', padding: '2px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: '600' },
-  actions: { display: 'flex', gap: '6px' },
-  editBtn: { background: '#f1f5f9', border: 'none', padding: '4px 10px', borderRadius: '6px', cursor: 'pointer', fontSize: '14px' },
-  permissionBtn: { background: '#fef3c7', border: 'none', padding: '4px 10px', borderRadius: '6px', cursor: 'pointer', fontSize: '14px' },
-  deleteBtn: { background: '#fee2e2', border: 'none', padding: '4px 10px', borderRadius: '6px', cursor: 'pointer', fontSize: '14px' },
-  
-  // ✅ Pending item
-  pendingItem: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: '14px 16px',
-    background: '#fffbeb',
-    borderRadius: '12px',
-    border: '2px solid #fde68a',
-    flexWrap: 'wrap',
-    gap: '12px',
+  tr: {
+    borderBottom: '1px solid #f1f5f9',
+    transition: 'background 0.15s',
   },
-  pendingLeft: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '12px',
-    flex: 1,
-    minWidth: '240px',
+  td: {
+    padding: '12px 16px',
+    verticalAlign: 'middle',
+    fontSize: '14px',
+    color: '#1e293b',
   },
-  pendingAvatar: {
-    width: '52px',
-    height: '52px',
+  checkbox: {
+    width: '18px',
+    height: '18px',
+    cursor: 'pointer',
+    accentColor: '#16a34a',
+  },
+  avatar: {
+    width: '40px',
+    height: '40px',
     borderRadius: '50%',
-    background: '#f59e0b',
+    objectFit: 'cover',
+    border: '2px solid #e2e8f0',
+  },
+  avatarPlaceholder: {
+    width: '40px',
+    height: '40px',
+    borderRadius: '50%',
+    background: '#16a34a',
+    color: 'white',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    overflow: 'hidden',
-    flexShrink: 0,
-    border: '2px solid #fde68a',
-  },
-  pendingAvatarImg: {
-    width: '100%',
-    height: '100%',
-    objectFit: 'cover',
-  },
-  pendingAvatarText: {
-    fontSize: '22px',
+    fontSize: '16px',
     fontWeight: '700',
-    color: 'white',
   },
-  pendingInfo: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '3px',
-    flex: 1,
-  },
-  pendingName: {
-    fontSize: '15px',
-    fontWeight: '700',
-    color: '#0f172a',
-  },
-  pendingMeta: {
-    display: 'flex',
-    gap: '12px',
-    flexWrap: 'wrap',
+  classBadge: {
+    background: '#dbeafe',
+    color: '#2563eb',
+    padding: '2px 12px',
+    borderRadius: '20px',
     fontSize: '12px',
-    color: '#64748b',
-  },
-  pendingDate: {
-    fontSize: '11px',
-    color: '#94a3b8',
-    marginTop: '2px',
-  },
-  approveBtn: {
-    background: '#16a34a',
-    color: 'white',
-    border: 'none',
-    padding: '8px 14px',
-    borderRadius: '8px',
-    cursor: 'pointer',
-    fontSize: '16px',
     fontWeight: '600',
-    transition: 'all 0.2s ease',
+    display: 'inline-block',
   },
-  rejectBtn: {
-    background: '#dc2626',
-    color: 'white',
+  editBtn: {
+    background: '#f1f5f9',
     border: 'none',
-    padding: '8px 14px',
-    borderRadius: '8px',
+    padding: '4px 10px',
+    borderRadius: '6px',
     cursor: 'pointer',
-    fontSize: '16px',
-    fontWeight: '600',
-    transition: 'all 0.2s ease',
+    fontSize: '14px',
+    marginRight: '4px',
   },
-  
-  popupSuccess: {
-    position: 'fixed',
-    top: '20px',
-    right: '20px',
-    zIndex: 9999,
-    background: 'linear-gradient(135deg, #dcfce7, #bbf7d0)',
-    color: '#166534',
-    padding: '14px 22px',
-    borderRadius: '14px',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '12px',
-    border: '1px solid #86efac',
-    boxShadow: '0 10px 30px rgba(22, 163, 74, 0.3)',
-    maxWidth: '400px',
-    animation: 'slideIn 0.5s ease',
-  },
-  popupError: {
-    position: 'fixed',
-    top: '20px',
-    right: '20px',
-    zIndex: 9999,
-    background: 'linear-gradient(135deg, #fee2e2, #fecaca)',
-    color: '#991b1b',
-    padding: '14px 22px',
-    borderRadius: '14px',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '12px',
-    border: '1px solid #fca5a5',
-    boxShadow: '0 10px 30px rgba(220, 38, 38, 0.3)',
-    maxWidth: '400px',
-    animation: 'slideIn 0.5s ease',
-  },
-  popupClose: {
-    background: 'none',
+  deleteBtn: {
+    background: '#fee2e2',
     border: 'none',
-    fontSize: '18px',
+    padding: '4px 10px',
+    borderRadius: '6px',
     cursor: 'pointer',
-    marginLeft: 'auto',
-    padding: '4px',
+    fontSize: '14px',
   },
 };
 
-const styleSheet = document.createElement('style');
-styleSheet.textContent = `
-  @keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
+// ✅ মোবাইল রেসপনসিভ
+const mobileStyles = `
+  @media (max-width: 640px) {
+    .header { flex-direction: column; align-items: stretch; }
+    .header-actions { flex-direction: column; }
+    .header-actions button { width: 100%; text-align: center; }
+    .stats-bar { flex-direction: column; align-items: stretch; }
+    .search-input { width: 100%; }
+    .tab-container { justify-content: center; }
+    .tab { font-size: 12px; padding: 6px 12px; }
+    .table th, .table td { padding: 8px 10px; font-size: 12px; }
+    .avatar, .avatar-placeholder { width: 32px; height: 32px; font-size: 12px; }
+    .form-grid { grid-template-columns: 1fr; }
   }
-  @keyframes slideIn {
-    from { opacity: 0; transform: translateX(20px); }
-    to { opacity: 1; transform: translateX(0); }
+  @media (min-width: 641px) and (max-width: 1024px) {
+    .form-grid { grid-template-columns: repeat(2, 1fr); }
   }
 `;
+
+const styleSheet = document.createElement('style');
+styleSheet.textContent = mobileStyles;
 document.head.appendChild(styleSheet);
