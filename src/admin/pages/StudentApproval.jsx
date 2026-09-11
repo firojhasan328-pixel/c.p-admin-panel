@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../supabaseClient';
 import { useAdmin } from '../../context/AdminContext';
+import StudentEditModal from '../components/StudentEditModal';
 
 export default function StudentApproval() {
   const { adminUser } = useAdmin();
@@ -15,6 +16,10 @@ export default function StudentApproval() {
   const [errorMessage, setErrorMessage] = useState('');
   const [selectedStudents, setSelectedStudents] = useState([]);
 
+  // ✅ নতুন: Edit Modal state
+  const [editingStudent, setEditingStudent] = useState(null);
+  const [showEditModal, setShowEditModal] = useState(false);
+
   // ✅ স্ট্যাটিস্টিক্স স্টেট
   const [stats, setStats] = useState({
     total: 0,
@@ -24,7 +29,7 @@ export default function StudentApproval() {
   });
 
   // =============================================
-  // ✅ ডেটা ফেচ + রিয়েল টাইম
+  // ✅ ডেটা ফেচ + রিয়েল টাইম
   // =============================================
   useEffect(() => {
     fetchStudents();
@@ -37,7 +42,7 @@ export default function StudentApproval() {
         schema: 'public',
         table: 'registration_requests',
       }, () => {
-        fetchStudents(); // রিফ্রেশ ছাড়াই আপডেট
+        fetchStudents();
       })
       .subscribe();
 
@@ -110,7 +115,7 @@ export default function StudentApproval() {
         created_at: new Date().toISOString(),
       };
 
-      // ইমেইল দিয়ে existing চেক
+      // ইমেইল দিয়ে existing চেক
       const { data: existingStudent } = await supabase
         .from('students')
         .select('id')
@@ -151,7 +156,7 @@ export default function StudentApproval() {
         }]);
 
       setSuccessMessage(`✅ "${request.student_name}" অনুমোদন করা হয়েছে!`);
-      await fetchStudents(); // রিফ্রেশ
+      await fetchStudents();
 
       setTimeout(() => setSuccessMessage(''), 5000);
 
@@ -240,6 +245,14 @@ export default function StudentApproval() {
       setErrorMessage('❌ ডিলিট করতে সমস্যা');
     }
     setActionLoading(false);
+  };
+
+  // =============================================
+  // ✅ Edit Modal খোলা
+  // =============================================
+  const handleEdit = (student) => {
+    setEditingStudent(student);
+    setShowEditModal(true);
   };
 
   // =============================================
@@ -357,7 +370,7 @@ export default function StudentApproval() {
       <h2 style={styles.title}>✅ ছাত্র অনুমোদন</h2>
       <p style={styles.subtitle}>নতুন রেজিস্টার করা ছাত্রদের অনুমোদন বা বাতিল করুন</p>
 
-      {/* ✅ স্ট্যাটিস্টিক্স — রিয়েল টাইম */}
+      {/* ✅ স্ট্যাটিস্টিক্স — রিয়েল টাইম */}
       <div style={styles.statsGrid}>
         <div style={{ ...styles.statCard, background: 'linear-gradient(135deg, #3b82f6, #2563eb)' }}>
           <div style={styles.statIcon}>📋</div>
@@ -393,7 +406,7 @@ export default function StudentApproval() {
       <div style={styles.filterBar}>
         <input
           type="text"
-          placeholder="🔍 নাম, ইমেইল বা ফোন দিয়ে খুঁজুন..."
+          placeholder="🔍 নাম, ইমেইল বা ফোন দিয়ে খুঁজুন..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           style={styles.searchInput}
@@ -521,61 +534,68 @@ export default function StudentApproval() {
                       {new Date(student.created_at).toLocaleDateString('bn-BD')}
                     </td>
                     <td style={styles.td}>
-                      {student.status === 'pending' && (
-                        <div style={styles.actionButtons}>
-                          <button
-                            onClick={() => {
-                              setSelectedStudent(student);
-                              setShowDetailModal(true);
-                            }}
-                            style={styles.detailBtn}
-                            title="বিস্তারিত"
-                          >
-                            📋
-                          </button>
-                          <button
-                            onClick={() => handleApprove(student)}
-                            disabled={actionLoading}
-                            style={styles.approveBtn}
-                            title="অনুমোদন"
-                          >
-                            ✅
-                          </button>
-                          <button
-                            onClick={() => handleReject(student)}
-                            disabled={actionLoading}
-                            style={styles.rejectBtn}
-                            title="বাতিল"
-                          >
-                            ❌
-                          </button>
-                        </div>
-                      )}
-                      {student.status !== 'pending' && (
-                        <>
-                          <button
-                            onClick={() => {
-                              setSelectedStudent(student);
-                              setShowDetailModal(true);
-                            }}
-                            style={styles.detailBtn}
-                            title="বিস্তারিত"
-                          >
-                            📋
-                          </button>
+                      <div style={styles.actionButtons}>
+                        {/* ✅ নতুন: Edit বাটন */}
+                        <button
+                          onClick={() => handleEdit(student)}
+                          disabled={actionLoading}
+                          style={styles.editBtn}
+                          title="তথ্য এডিট করুন"
+                        >
+                          ✏️
+                        </button>
+
+                        {/* Detail বাটন */}
+                        <button
+                          onClick={() => {
+                            setSelectedStudent(student);
+                            setShowDetailModal(true);
+                          }}
+                          style={styles.detailBtn}
+                          title="বিস্তারিত"
+                        >
+                          📋
+                        </button>
+
+                        {/* Approve/Reject বাটন (শুধু pending হলে) */}
+                        {student.status === 'pending' && (
+                          <>
+                            <button
+                              onClick={() => handleApprove(student)}
+                              disabled={actionLoading}
+                              style={styles.approveBtn}
+                              title="অনুমোদন"
+                            >
+                              ✅
+                            </button>
+                            <button
+                              onClick={() => handleReject(student)}
+                              disabled={actionLoading}
+                              style={styles.rejectBtn}
+                              title="বাতিল"
+                            >
+                              ❌
+                            </button>
+                          </>
+                        )}
+
+                        {/* Approved/Rejected হলে স্ট্যাটাস আইকন */}
+                        {student.status !== 'pending' && (
                           <span style={styles.statusText}>
                             {student.status === 'approved' ? '✅' : '❌'}
                           </span>
-                        </>
-                      )}
-                      <button
-                        onClick={() => handleDelete(student)}
-                        disabled={actionLoading}
-                        style={styles.deleteBtn}
-                        title="রিসাইকেল বিনে সরান"
-                      >
-                        🗑️
-                      </button>
+                        )}
+
+                        {/* Delete বাটন */}
+                        <button
+                          onClick={() => handleDelete(student)}
+                          disabled={actionLoading}
+                          style={styles.deleteBtn}
+                          title="রিসাইকেল বিনে সরান"
+                        >
+                          🗑️
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -664,6 +684,21 @@ export default function StudentApproval() {
             )}
           </div>
         </div>
+      )}
+
+      {/* ✅ নতুন: Edit Modal */}
+      {showEditModal && editingStudent && (
+        <StudentEditModal
+          student={editingStudent}
+          isOpen={showEditModal}
+          onClose={() => {
+            setShowEditModal(false);
+            setEditingStudent(null);
+          }}
+          onSuccess={() => {
+            fetchStudents();
+          }}
+        />
       )}
     </div>
   );
@@ -862,6 +897,17 @@ const styles = {
     display: 'inline-flex',
     gap: '4px',
     flexWrap: 'wrap',
+  },
+  // ✅ নতুন: Edit বাটন স্টাইল
+  editBtn: {
+    background: '#e0e7ff',
+    color: '#4338ca',
+    border: 'none',
+    padding: '5px 10px',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    fontSize: '14px',
+    transition: 'all 0.2s ease',
   },
   detailBtn: {
     background: '#e0e7ff',
