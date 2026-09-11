@@ -28,12 +28,16 @@ export default function StudentsManager() {
     fetchStudents();
   }, []);
 
+  // =============================================
+  // ✅ শুধু অনুমোদিত ছাত্র লোড (is_approved = true)
+  // =============================================
   const fetchStudents = async () => {
     setLoading(true);
     try {
       const { data, error } = await supabase
         .from('students')
         .select('*')
+        .eq('is_approved', true)  // ✅ শুধু অনুমোদিত
         .order('class_name')
         .order('roll_number');
 
@@ -119,7 +123,7 @@ export default function StudentsManager() {
       return;
     }
 
-    const headers = ['নাম', 'ক্লাস', 'রোল', 'বাবার নাম', 'মায়ের নাম', 'ফোন', 'ইমেইল'];
+    const headers = ['নাম', 'ক্লাস', 'রোল', 'বাবার নাম', 'মায়ের নাম', 'ফোন', 'ইমেইল'];
     const rows = filteredData.map(s => [
       s.name, s.class_name, s.roll_number || '', s.father_name || '',
       s.mother_name || '', s.phone || '', s.email || ''
@@ -149,7 +153,8 @@ export default function StudentsManager() {
       if (editing) {
         await supabase.from('students').update(formData).eq('id', editing);
       } else {
-        await supabase.from('students').insert([formData]);
+        // ✅ নতুন ছাত্র যোগ করলে is_approved: true
+        await supabase.from('students').insert([{ ...formData, is_approved: true, is_verified: true }]);
       }
       setShowForm(false);
       setEditing(null);
@@ -231,7 +236,7 @@ export default function StudentsManager() {
 
       {/* ✅ মোট ছাত্র + সার্চ */}
       <div style={styles.statsBar}>
-        <span style={styles.totalCount}>👥 মোট ছাত্র: {students.length} জন</span>
+        <span style={styles.totalCount}>👥 মোট অনুমোদিত ছাত্র: {students.length} জন</span>
         <input
           type="text"
           placeholder="🔍 নাম, রোল বা ফোন দিয়ে খুঁজুন..."
@@ -266,7 +271,7 @@ export default function StudentsManager() {
       ) : filteredData.length === 0 ? (
         <div style={styles.emptyState}>
           <span style={styles.emptyIcon}>📭</span>
-          <p>এই ক্লাসে কোনো ছাত্র নেই</p>
+          <p>এই ক্লাসে কোনো অনুমোদিত ছাত্র নেই</p>
         </div>
       ) : (
         <div style={styles.tableWrapper}>
@@ -303,10 +308,22 @@ export default function StudentsManager() {
                   </td>
                   <td style={styles.td}>
                     {student.photo_url ? (
-                      <img src={student.photo_url} alt={student.name} style={styles.avatar} />
-                    ) : (
-                      <div style={styles.avatarPlaceholder}>{student.name?.charAt(0) || '?'}</div>
-                    )}
+                      <img
+                        src={student.photo_url}
+                        alt={student.name}
+                        style={styles.avatar}
+                        onError={(e) => {
+                          e.target.style.display = 'none';
+                          if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex';
+                        }}
+                      />
+                    ) : null}
+                    <div style={{
+                      ...styles.avatarPlaceholder,
+                      display: student.photo_url ? 'none' : 'flex'
+                    }}>
+                      {student.name?.charAt(0) || '?'}
+                    </div>
                   </td>
                   <td style={styles.td}><strong>{student.name}</strong></td>
                   <td style={styles.td}><span style={styles.classBadge}>{student.class_name}</span></td>
