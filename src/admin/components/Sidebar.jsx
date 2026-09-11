@@ -4,7 +4,7 @@ import { useAdmin } from '../../context/AdminContext';
 import { usePermissions } from '../../hooks/usePermissions';
 
 // =============================================
-// ✅ রোল অনুযায়ী মেনু দেখানো
+// ✅ রোল অনুযায়ী মেনু দেখানো
 // =============================================
 const getMenuItems = (role, hasPermission) => {
   // সবাই দেখতে পারে এমন মেনু
@@ -28,12 +28,11 @@ const getMenuItems = (role, hasPermission) => {
     { path: '/seo', icon: '🔍', label: 'এসইও', permission: 'manage_seo' },
     { path: '/media', icon: '📁', label: 'মিডিয়া', permission: 'manage_media' },
     { path: '/registration-codes', icon: '🔑', label: 'রেজিস্ট্রেশন কোড', permission: 'manage_registration' },
-    { path: '/registration-requests', icon: '📩', label: 'ছাত্র অনুরোধ', permission: 'manage_students' },
+    // ❌ ছাত্র অনুরোধ মেনু সরানো হয়েছে
     { path: '/results', icon: '📊', label: 'রেজাল্ট ম্যানেজার', permission: 'manage_results' },
     { path: '/routines', icon: '📅', label: 'রুটিন ম্যানেজার', permission: 'manage_routines' },
     { path: '/assignments', icon: '📝', label: 'অ্যাসাইনমেন্ট ম্যানেজার', permission: 'manage_assignments' },
     { path: '/attendance', icon: '📈', label: 'উপস্থিতি ম্যানেজার', permission: 'manage_attendance' },
-    // ✅ নতুন মেনু: অর্জন ম্যানেজার
     { path: '/achievements', icon: '🏆', label: 'অর্জন ম্যানেজার', permission: 'manage_achievements' },
   ];
 
@@ -89,7 +88,7 @@ export default function Sidebar({ isOpen, toggleSidebar }) {
     }
   };
 
-  // রোল অনুযায়ী ব্যাজ
+  // রোল অনুযায়ী ব্যাজ
   const getRoleBadge = () => {
     const role = adminUser?.role;
     if (role === 'super_admin') return { label: '⭐ সুপার অ্যাডমিন', color: '#16a34a' };
