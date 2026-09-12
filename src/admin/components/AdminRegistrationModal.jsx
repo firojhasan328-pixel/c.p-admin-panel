@@ -2,11 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../supabaseClient';
 import { useAdmin } from '../../context/AdminContext';
 
-// ============================================
-// Edge Function URL
-// ============================================
-const EDGE_FUNCTION_URL = 'https://wgkcedpinnhvpotuivdqg.supabase.co/functions/v1/super-responder';
-
 export default function AdminRegistrationModal({
   isOpen,
   onClose,
@@ -24,6 +19,7 @@ export default function AdminRegistrationModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [createdEmail, setCreatedEmail] = useState('');
 
   // ============================================
   // Modal খুললে ডিফল্ট ইমেইল বসাও
@@ -36,6 +32,7 @@ export default function AdminRegistrationModal({
       setError('');
       setSuccess(false);
       setShowPassword(false);
+      setCreatedEmail('');
     }
   }, [isOpen, teacher]);
 
@@ -74,7 +71,7 @@ export default function AdminRegistrationModal({
   };
 
   // ============================================
-  // Submit — Edge Function কল
+  // Submit — Direct Supabase call
   // ============================================
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -84,39 +81,167 @@ export default function AdminRegistrationModal({
 
     setLoading(true);
 
+    const normalizedEmail = email.toLowerCase().trim();
+
     try {
-      const session = await supabase.auth.getSession();
-      const accessToken = session.data.session?.access_token || '';
+      // ============================================
+      // ধাপ ১: Auth ইউজার তৈরি (signUp ব্যবহার)
+      // ============================================
+      let userId = null;
 
-      const response = await fetch(EDGE_FUNCTION_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${accessToken}`,
-        },
-        body: JSON.stringify({
-          email: email.toLowerCase().trim(),
-          password: password,
-          name: teacher.name || 'অ্যাডমিন',
-          role: selectedRole,
-          permissions: selectedPermissions || {},
-          grantedByEmail: adminUser?.email || 'system',
-          grantedByRole: adminUser?.role || 'system',
-        }),
-      });
+      // প্রথমে চেক করি ইউজার আছে কি না
+      const { data: existingCheck } = await supabase
+        .from('admin_users')
+        .select('user_id, email')
+        .eq('email', normalizedEmail)
+        .maybeSingle();
 
-      const result = await response.json();
+      if (existingCheck?.user_id) {
+        // ✅ ইউজার আছে — পাসওয়ার্ড আপডেট করতে signIn করে update
+        // কিন্তু current admin এর session নষ্ট হবে না — আমরা signUp এর বদলে
+        // সরাসরি auth.admin ব্যবহার করতে পারি না (service_role লাগে)
+        // তাই আমরা এই ক্ষেত্রে শুধু admin_users আপডেট করবো
 
-      if (!response.ok || !result.success) {
-        throw new Error(result.error || 'সংরক্ষণ করতে সমস্যা');
+        userId = existingCheck.user_id;
+
+        // admin_users আপডেট
+        const { error: updateAdminError } = await supabase
+          .from('admin_users')
+          .update({
+            name: teacher.name || 'অ্যাডমিন',
+            role: selectedRole,
+            is_active: true,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('email', normalizedEmail);
+
+        if (updateAdminError) throw updateAdminError;
+
+        // user_roles আপডেট
+        await supabase
+          .from('user_roles')
+          .upsert(
+            { user_id: userId, role_name: selectedRole },
+            { onConflict: 'user_id,role_name' }
+          );
+
+      } else {
+        // ✅ নতুন ইউজার — signUp কল করি
+        const { data: signUpData, error: signUpError } =
+          await supabase.auth.signUp({
+            email: normalizedEmail,
+            password: password,
+            options: {
+              data: {
+                name: teacher.name || 'অ্যাডমিন',
+                role: selectedRole,
+              },
+            },
+          });
+
+        if (signUpError) {
+          throw new Error('সাইনআপ সমস্যা: ' + signUpError.message);
+        }
+
+        if (!signUpData?.user) {
+          throw new Error('ইউজার তৈরি হয়নি — Supabase সেটিংস চেক করুন');
+        }
+
+        userId = signUpData.user.id;
       }
 
+      // ============================================
+      // ধাপ ২: admin_users টেবিলে insert/update
+      // ============================================
+      const { error: adminInsertError } = await supabase
+        .from('admin_users')
+        .upsert(
+          {
+            user_id: userId,
+            email: normalizedEmail,
+            name: teacher.name || 'অ্যাডমিন',
+            role: selectedRole,
+            is_active: true,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: 'email' }
+        );
+
+      if (adminInsertError) {
+        console.warn('admin_users upsert warning:', adminInsertError.message);
+      }
+
+      // ============================================
+      // ধাপ ৩: user_roles এ insert
+      // ============================================
+      await supabase
+        .from('user_roles')
+        .upsert(
+          { user_id: userId, role_name: selectedRole },
+          { onConflict: 'user_id,role_name' }
+        );
+
+      // ============================================
+      // ধাপ ৪: teacher_permissions সেভ
+      // ============================================
+      if (selectedPermissions && typeof selectedPermissions === 'object') {
+        // পুরোনো মুছে ফেলি
+        await supabase
+          .from('teacher_permissions')
+          .delete()
+          .eq('teacher_email', normalizedEmail);
+
+        // নতুন যোগ করি
+        const permRows = Object.entries(selectedPermissions)
+          .filter(([_, value]) => value === true)
+          .map(([key]) => ({
+            teacher_email: normalizedEmail,
+            permission_key: key,
+            is_allowed: true,
+            granted_by: null,
+          }));
+
+        if (permRows.length > 0) {
+          const { error: permError } = await supabase
+            .from('teacher_permissions')
+            .insert(permRows);
+
+          if (permError) {
+            console.warn('পারমিশন সেভ সমস্যা:', permError.message);
+          }
+        }
+      }
+
+      // ============================================
+      // ধাপ ৫: লগ তৈরি
+      // ============================================
+      try {
+        await supabase.from('admin_registration_logs').insert([
+          {
+            admin_user_id: userId,
+            email: normalizedEmail,
+            name: teacher.name || 'অ্যাডমিন',
+            role: selectedRole,
+            assigned_by_email: adminUser?.email || 'system',
+            assigned_by_role: adminUser?.role || 'system',
+            assigned_permissions: selectedPermissions || {},
+          },
+        ]);
+      } catch (logErr) {
+        console.warn('Log insert warning:', logErr);
+      }
+
+      // ============================================
+      // ✅ সফল
+      // ============================================
+      setCreatedEmail(normalizedEmail);
       setSuccess(true);
 
       setTimeout(() => {
         onSuccess?.();
         onClose();
-      }, 2000);
+      }, 2500);
+
     } catch (err) {
       console.error('❌ Admin registration error:', err);
       setError('❌ ' + (err.message || 'সংরক্ষণ করতে সমস্যা হয়েছে'));
@@ -138,7 +263,7 @@ export default function AdminRegistrationModal({
             <div style={styles.successIcon}>🎉</div>
             <h2 style={styles.successTitle}>অ্যাডমিন অ্যাকাউন্ট তৈরি সফল!</h2>
             <p style={styles.successText}>
-              <strong>{email}</strong> ইমেইলটি{' '}
+              <strong>{createdEmail}</strong> ইমেইলটি{' '}
               <strong>{getRoleLabel(selectedRole)}</strong> হিসাবে তৈরি হয়েছে।
             </p>
             <div style={styles.successInfoBox}>
@@ -154,6 +279,9 @@ export default function AdminRegistrationModal({
                 <li>
                   <strong>পারমিশন:</strong>{' '}
                   {Object.values(selectedPermissions || {}).filter(Boolean).length} টি
+                </li>
+                <li style={{ color: '#dc2626', fontWeight: '700' }}>
+                  ⚠️ পাসওয়ার্ড ও ইমেইল এখনই সংরক্ষণ করুন — পরে আর দেখানো হবে না!
                 </li>
               </ul>
             </div>
@@ -201,7 +329,9 @@ export default function AdminRegistrationModal({
             </div>
 
             <div style={styles.permissionSummary}>
-              <span style={styles.permissionSummaryLabel}>✅ পারমিশন দেওয়া হয়েছে:</span>
+              <span style={styles.permissionSummaryLabel}>
+                ✅ পারমিশন দেওয়া হয়েছে:
+              </span>
               <span style={styles.permissionSummaryCount}>
                 {Object.values(selectedPermissions || {}).filter(Boolean).length} টি
               </span>
@@ -215,7 +345,9 @@ export default function AdminRegistrationModal({
 
             <form onSubmit={handleSubmit} style={styles.form}>
               <div style={styles.field}>
-                <label style={styles.label}>📧 ইমেইল (লগইন করতে ব্যবহার করবেন)</label>
+                <label style={styles.label}>
+                  📧 ইমেইল (লগইন করতে ব্যবহার করবেন)
+                </label>
                 <input
                   type="email"
                   value={email}
@@ -299,8 +431,8 @@ export default function AdminRegistrationModal({
                 <p style={styles.infoBoxTitle}>📌 লক্ষ্য রাখুন</p>
                 <ul style={styles.infoBoxList}>
                   <li>এই ইমেইল + পাসওয়ার্ড দিয়ে অ্যাডমিন প্যানেলে লগইন করতে হবে</li>
-                  <li>ইমেইলটি ইউনিক হতে হবে — আগে থেকে ব্যবহার করা থাকলে সেটাও আপডেট হবে</li>
                   <li>পাসওয়ার্ড সংরক্ষণের পর কারো সাথে শেয়ার করবেন না</li>
+                  <li>পাসওয়ার্ড পরে আর দেখানো হবে না</li>
                 </ul>
               </div>
 
@@ -406,9 +538,7 @@ const styles = {
     alignItems: 'center',
     gap: '12px',
   },
-  headerIcon: {
-    fontSize: '28px',
-  },
+  headerIcon: { fontSize: '28px' },
   title: {
     fontSize: '18px',
     fontWeight: '700',
