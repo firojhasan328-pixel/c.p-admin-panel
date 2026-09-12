@@ -7,7 +7,7 @@ import { usePermissions, ROLE_BADGES } from '../../hooks/usePermissions';
 // রোল অনুযায়ী মেনু তৈরি
 // ============================================
 const getMenuItems = (role, hasPermission) => {
-  // সব রোল দেখতে পারে (view_dashboard permission থাকলে)
+  // সব রোল দেখতে পারে
   const baseMenus = [
     {
       path: '/',
@@ -171,14 +171,12 @@ const getMenuItems = (role, hasPermission) => {
 
   let menus = [...baseMenus];
 
-  // management মেনু — রোল যেটাই হোক, পারমিশন থাকলে দেখাবে
+  // management মেনু
   managementMenus.forEach((menu) => {
-    // সুপার অ্যাডমিন সবই দেখবে
     if (role === 'super_admin') {
       menus.push(menu);
       return;
     }
-    // অন্যদের পারমিশন চেক করতে হবে
     if (hasPermission(menu.permission)) {
       menus.push(menu);
     }
@@ -198,7 +196,9 @@ export default function Sidebar({ isOpen, toggleSidebar }) {
   const location = useLocation();
   const { adminUser, logout } = useAdmin();
   const { hasPermission } = usePermissions();
-  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+  const [isMobile, setIsMobile] = useState(
+    typeof window !== 'undefined' ? window.innerWidth <= 768 : false
+  );
 
   useEffect(() => {
     const handleResize = () => {
@@ -232,7 +232,10 @@ export default function Sidebar({ isOpen, toggleSidebar }) {
 
   return (
     <>
-      <div
+      {/* ============================================
+          সাইডবার
+          ============================================ */}
+      <aside
         style={{
           ...styles.sidebar,
           transform: isMobile
@@ -242,14 +245,14 @@ export default function Sidebar({ isOpen, toggleSidebar }) {
             : 'translateX(0)',
         }}
       >
-        {/* লোগো */}
+        {/* লোগো — সবসময় উপরে আটকে থাকবে */}
         <div style={styles.logo}>
           <span style={styles.logoIcon}>📚</span>
           <span style={styles.logoText}>চিলমারী</span>
           <span style={styles.logoBadge}>ADMIN</span>
         </div>
 
-        {/* ইউজার প্রোফাইল */}
+        {/* ইউজার প্রোফাইল — সবসময় উপরে আটকে থাকবে */}
         <div style={styles.profile}>
           <div style={styles.profileAvatar}>
             {adminUser?.name?.charAt(0) || 'A'}
@@ -270,39 +273,44 @@ export default function Sidebar({ isOpen, toggleSidebar }) {
           </div>
         </div>
 
-        {/* মেনু */}
+        {/* ============================================
+            মেনু — এটাই স্ক্রল হবে
+            ============================================ */}
         <nav style={styles.nav}>
-          {menuItems.map((item) => (
-            <Link
-              key={item.path}
-              to={item.path}
-              style={{
-                ...styles.link,
-                ...(location.pathname === item.path ? styles.active : {}),
-              }}
-              onClick={handleLinkClick}
-            >
-              <span style={styles.linkIcon}>{item.icon}</span>
-              <span style={styles.linkLabel}>{item.label}</span>
-              {location.pathname === item.path && (
-                <span style={styles.activeIndicator}></span>
-              )}
-            </Link>
-          ))}
+          {menuItems.map((item) => {
+            const isActive = location.pathname === item.path;
+            return (
+              <Link
+                key={item.path}
+                to={item.path}
+                style={{
+                  ...styles.link,
+                  ...(isActive ? styles.active : {}),
+                }}
+                onClick={handleLinkClick}
+              >
+                <span style={styles.linkIcon}>{item.icon}</span>
+                <span style={styles.linkLabel}>{item.label}</span>
+                {isActive && <span style={styles.activeIndicator}></span>}
+              </Link>
+            );
+          })}
         </nav>
 
-        {/* লগআউট */}
+        {/* ============================================
+            লগআউট — সবসময় নিচে আটকে থাকবে
+            ============================================ */}
         <div style={styles.logoutSection}>
           <button onClick={logout} style={styles.logoutBtn}>
             <span>🚪</span> লগআউট
           </button>
         </div>
 
-        {/* ভার্সন */}
+        {/* ভার্সন — একেবারে নিচে */}
         <div style={styles.version}>v1.0.0</div>
-      </div>
+      </aside>
 
-      {/* ওভারলে (মোবাইলের জন্য) */}
+      {/* মোবাইলের ওভারলে */}
       {isMobile && isOpen && (
         <div style={styles.overlay} onClick={toggleSidebar}></div>
       )}
@@ -311,32 +319,36 @@ export default function Sidebar({ isOpen, toggleSidebar }) {
 }
 
 // ============================================
-// স্টাইল (আগের মতোই — অপরিবর্তিত)
+// স্টাইল — মোবাইল-ফ্রেন্ডলি
 // ============================================
 const styles = {
   sidebar: {
     width: '260px',
     background: 'linear-gradient(180deg, #0f172a 0%, #1e293b 100%)',
     color: 'white',
-    minHeight: '100vh',
-    padding: '20px 0',
+    height: '100vh',
+    maxHeight: '100vh',
+    padding: 0,
     position: 'fixed',
     top: 0,
     left: 0,
-    overflowY: 'auto',
+    bottom: 0,
     zIndex: 999,
     transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
     boxShadow: '4px 0 20px rgba(0,0,0,0.3)',
+    display: 'flex',
+    flexDirection: 'column',
+    overflow: 'hidden',
   },
   logo: {
     display: 'flex',
     alignItems: 'center',
-    padding: '0 20px 20px 20px',
+    padding: '18px 20px',
     borderBottom: '1px solid rgba(255,255,255,0.08)',
-    marginBottom: '20px',
     gap: '10px',
+    flexShrink: 0,
   },
-  logoIcon: { fontSize: '28px' },
+  logoIcon: { fontSize: '26px' },
   logoText: {
     fontSize: '18px',
     fontWeight: '700',
@@ -356,9 +368,9 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     gap: '12px',
-    padding: '0 20px 20px 20px',
+    padding: '14px 20px',
     borderBottom: '1px solid rgba(255,255,255,0.06)',
-    marginBottom: '12px',
+    flexShrink: 0,
   },
   profileAvatar: {
     width: '42px',
@@ -388,6 +400,7 @@ const styles = {
     alignItems: 'center',
     gap: '6px',
     fontWeight: '600',
+    marginTop: '2px',
   },
   onlineDot: {
     width: '6px',
@@ -401,8 +414,12 @@ const styles = {
     display: 'flex',
     flexDirection: 'column',
     gap: '2px',
-    padding: '0 10px',
+    padding: '10px',
     flex: 1,
+    minHeight: 0,
+    overflowY: 'auto',
+    overflowX: 'hidden',
+    WebkitOverflowScrolling: 'touch',
   },
   link: {
     display: 'flex',
@@ -416,9 +433,20 @@ const styles = {
     transition: 'all 0.25s ease',
     position: 'relative',
     fontWeight: '500',
+    flexShrink: 0,
   },
-  linkIcon: { fontSize: '18px', width: '24px', textAlign: 'center' },
-  linkLabel: { flex: 1 },
+  linkIcon: {
+    fontSize: '18px',
+    width: '24px',
+    textAlign: 'center',
+    flexShrink: 0,
+  },
+  linkLabel: {
+    flex: 1,
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+  },
   active: {
     background: 'rgba(22, 163, 74, 0.15)',
     color: '#16a34a',
@@ -430,11 +458,14 @@ const styles = {
     borderRadius: '4px',
     position: 'absolute',
     right: '0',
+    top: '50%',
+    transform: 'translateY(-50%)',
   },
   logoutSection: {
-    padding: '16px 20px 12px 20px',
+    padding: '12px 20px',
     borderTop: '1px solid rgba(255,255,255,0.06)',
-    marginTop: 'auto',
+    flexShrink: 0,
+    background: 'linear-gradient(180deg, rgba(15,23,42,0.8) 0%, #1e293b 100%)',
   },
   logoutBtn: {
     width: '100%',
@@ -456,8 +487,10 @@ const styles = {
     textAlign: 'center',
     fontSize: '11px',
     color: '#475569',
-    padding: '8px 0',
+    padding: '6px 0 12px 0',
     letterSpacing: '0.5px',
+    flexShrink: 0,
+    background: '#1e293b',
   },
   overlay: {
     position: 'fixed',
@@ -471,15 +504,34 @@ const styles = {
   },
 };
 
-const styleSheet = document.createElement('style');
-styleSheet.textContent = `
-  @keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.3; }
-  }
-  @keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
-  }
-`;
-document.head.appendChild(styleSheet);
+// ============================================
+// অ্যানিমেশন ইনজেক্ট
+// ============================================
+if (typeof document !== 'undefined') {
+  const styleSheet = document.createElement('style');
+  styleSheet.textContent = `
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    /* সাইডবারের স্ক্রলবার মোবাইলে হালকা দেখানোর জন্য */
+    aside::-webkit-scrollbar,
+    nav::-webkit-scrollbar {
+      width: 4px;
+    }
+    aside::-webkit-scrollbar-track,
+    nav::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    aside::-webkit-scrollbar-thumb,
+    nav::-webkit-scrollbar-thumb {
+      background: rgba(148, 163, 184, 0.3);
+      border-radius: 4px;
+    }
+  `;
+  document.head.appendChild(styleSheet);
+}
