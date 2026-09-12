@@ -1,64 +1,192 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAdmin } from '../../context/AdminContext';
-import { usePermissions } from '../../hooks/usePermissions';
+import { usePermissions, ROLE_BADGES } from '../../hooks/usePermissions';
 
-// =============================================
-// ✅ রোল অনুযায়ী মেনু দেখানো
-// =============================================
+// ============================================
+// রোল অনুযায়ী মেনু তৈরি
+// ============================================
 const getMenuItems = (role, hasPermission) => {
-  // সবাই দেখতে পারে এমন মেনু
+  // সব রোল দেখতে পারে (view_dashboard permission থাকলে)
   const baseMenus = [
-    { path: '/', icon: '📊', label: 'ড্যাশবোর্ড', permission: 'view_dashboard' },
+    {
+      path: '/',
+      icon: '📊',
+      label: 'ড্যাশবোর্ড',
+      permission: 'view_dashboard',
+    },
   ];
 
-  // অ্যাডমিন ও সুপার অ্যাডমিন দেখতে পারে
-  const adminMenus = [
-    { path: '/homepage', icon: '🏠', label: 'হোমপেজ', permission: 'edit_homepage' },
-    { path: '/admissions', icon: '📝', label: 'অনলাইন আবেদন ফরম', permission: 'manage_admissions' },
-    { path: '/student-approval', icon: '✅', label: 'ছাত্র অনুমোদন', permission: 'manage_students' },
-    { path: '/teachers', icon: '👨‍🏫', label: 'শিক্ষক', permission: 'manage_teachers' },
-    { path: '/students', icon: '🎓', label: 'ছাত্র', permission: 'manage_students' },
-    { path: '/notices', icon: '📢', label: 'নোটিশ', permission: 'manage_notices' },
-    { path: '/gallery', icon: '🖼️', label: 'গ্যালারি', permission: 'manage_gallery' },
-    { path: '/contact', icon: '📞', label: 'যোগাযোগ', permission: 'manage_contact' },
-    { path: '/footer', icon: '📋', label: 'ফুটার', permission: 'manage_footer' },
-    { path: '/theme', icon: '🎨', label: 'থিম', permission: 'manage_theme' },
-    { path: '/settings', icon: '⚙️', label: 'সেটিংস', permission: 'manage_settings' },
-    { path: '/seo', icon: '🔍', label: 'এসইও', permission: 'manage_seo' },
-    { path: '/media', icon: '📁', label: 'মিডিয়া', permission: 'manage_media' },
-    { path: '/registration-codes', icon: '🔑', label: 'রেজিস্ট্রেশন কোড', permission: 'manage_registration' },
-    // ❌ ছাত্র অনুরোধ মেনু সরানো হয়েছে
-    { path: '/results', icon: '📊', label: 'রেজাল্ট ম্যানেজার', permission: 'manage_results' },
-    { path: '/routines', icon: '📅', label: 'রুটিন ম্যানেজার', permission: 'manage_routines' },
-    { path: '/assignments', icon: '📝', label: 'অ্যাসাইনমেন্ট ম্যানেজার', permission: 'manage_assignments' },
-    { path: '/attendance', icon: '📈', label: 'উপস্থিতি ম্যানেজার', permission: 'manage_attendance' },
-    { path: '/achievements', icon: '🏆', label: 'অর্জন ম্যানেজার', permission: 'manage_achievements' },
+  // অ্যাডমিন, সাব-অ্যাডমিন, সুপার অ্যাডমিন দেখতে পারে
+  const managementMenus = [
+    {
+      path: '/homepage',
+      icon: '🏠',
+      label: 'হোমপেজ',
+      permission: 'edit_homepage',
+    },
+    {
+      path: '/admissions',
+      icon: '📝',
+      label: 'অনলাইন আবেদন ফরম',
+      permission: 'manage_admissions',
+    },
+    {
+      path: '/student-approval',
+      icon: '✅',
+      label: 'ছাত্র অনুমোদন',
+      permission: 'manage_students',
+    },
+    {
+      path: '/teachers',
+      icon: '👨‍🏫',
+      label: 'শিক্ষক',
+      permission: 'manage_teachers',
+    },
+    {
+      path: '/students',
+      icon: '🎓',
+      label: 'ছাত্র',
+      permission: 'manage_students',
+    },
+    {
+      path: '/notices',
+      icon: '📢',
+      label: 'নোটিশ',
+      permission: 'manage_notices',
+    },
+    {
+      path: '/gallery',
+      icon: '🖼️',
+      label: 'গ্যালারি',
+      permission: 'manage_gallery',
+    },
+    {
+      path: '/contact',
+      icon: '📞',
+      label: 'যোগাযোগ',
+      permission: 'manage_contact',
+    },
+    {
+      path: '/footer',
+      icon: '📋',
+      label: 'ফুটার',
+      permission: 'manage_footer',
+    },
+    {
+      path: '/theme',
+      icon: '🎨',
+      label: 'থিম',
+      permission: 'manage_theme',
+    },
+    {
+      path: '/settings',
+      icon: '⚙️',
+      label: 'সেটিংস',
+      permission: 'manage_settings',
+    },
+    {
+      path: '/seo',
+      icon: '🔍',
+      label: 'এসইও',
+      permission: 'manage_seo',
+    },
+    {
+      path: '/media',
+      icon: '📁',
+      label: 'মিডিয়া',
+      permission: 'manage_media',
+    },
+    {
+      path: '/registration-codes',
+      icon: '🔑',
+      label: 'রেজিস্ট্রেশন কোড',
+      permission: 'manage_registration',
+    },
+    {
+      path: '/results',
+      icon: '📊',
+      label: 'রেজাল্ট ম্যানেজার',
+      permission: 'manage_results',
+    },
+    {
+      path: '/routines',
+      icon: '📅',
+      label: 'রুটিন ম্যানেজার',
+      permission: 'manage_routines',
+    },
+    {
+      path: '/assignments',
+      icon: '📝',
+      label: 'অ্যাসাইনমেন্ট ম্যানেজার',
+      permission: 'manage_assignments',
+    },
+    {
+      path: '/attendance',
+      icon: '📈',
+      label: 'উপস্থিতি ম্যানেজার',
+      permission: 'manage_attendance',
+    },
+    {
+      path: '/achievements',
+      icon: '🏆',
+      label: 'অর্জন ম্যানেজার',
+      permission: 'manage_achievements',
+    },
   ];
 
   // শুধু সুপার অ্যাডমিন দেখতে পারে
   const superAdminMenus = [
-    { path: '/users', icon: '👥', label: 'ব্যবহারকারী', permission: 'manage_users' },
-    { path: '/permissions', icon: '🔐', label: 'পারমিশন', permission: 'manage_permissions' },
-    { path: '/backup', icon: '💾', label: 'ব্যাকআপ', permission: 'manage_backup' },
-    { path: '/logs', icon: '📋', label: 'অ্যাক্টিভিটি', permission: 'view_logs' },
-    { path: '/recycle', icon: '🗑️', label: 'রিসাইকেল', permission: 'manage_recycle' },
+    {
+      path: '/users',
+      icon: '👥',
+      label: 'ব্যবহারকারী',
+      permission: 'manage_users',
+    },
+    {
+      path: '/permissions',
+      icon: '🔐',
+      label: 'পারমিশন',
+      permission: 'manage_permissions',
+    },
+    {
+      path: '/backup',
+      icon: '💾',
+      label: 'ব্যাকআপ',
+      permission: 'manage_backup',
+    },
+    {
+      path: '/logs',
+      icon: '📋',
+      label: 'অ্যাক্টিভিটি',
+      permission: 'view_logs',
+    },
+    {
+      path: '/recycle',
+      icon: '🗑️',
+      label: 'রিসাইকেল',
+      permission: 'manage_recycle',
+    },
   ];
 
   let menus = [...baseMenus];
 
-  // অ্যাডমিন বা সুপার অ্যাডমিন
-  if (role === 'admin' || role === 'super_admin') {
-    adminMenus.forEach(menu => {
-      if (hasPermission(menu.permission)) {
-        menus.push(menu);
-      }
-    });
-  }
+  // management মেনু — রোল যেটাই হোক, পারমিশন থাকলে দেখাবে
+  managementMenus.forEach((menu) => {
+    // সুপার অ্যাডমিন সবই দেখবে
+    if (role === 'super_admin') {
+      menus.push(menu);
+      return;
+    }
+    // অন্যদের পারমিশন চেক করতে হবে
+    if (hasPermission(menu.permission)) {
+      menus.push(menu);
+    }
+  });
 
-  // শুধু সুপার অ্যাডমিন
+  // super admin-specific মেনু
   if (role === 'super_admin') {
-    superAdminMenus.forEach(menu => {
+    superAdminMenus.forEach((menu) => {
       menus.push(menu);
     });
   }
@@ -88,12 +216,15 @@ export default function Sidebar({ isOpen, toggleSidebar }) {
     }
   };
 
-  // রোল অনুযায়ী ব্যাজ
+  // ============================================
+  // রোল ব্যাজ
+  // ============================================
   const getRoleBadge = () => {
     const role = adminUser?.role;
-    if (role === 'super_admin') return { label: '⭐ সুপার অ্যাডমিন', color: '#16a34a' };
-    if (role === 'admin') return { label: '🔹 সাব অ্যাডমিন', color: '#2563eb' };
-    if (role === 'teacher') return { label: '👨‍🏫 শিক্ষক', color: '#f59e0b' };
+    const badge = ROLE_BADGES[role];
+    if (badge) {
+      return { label: badge.label, color: badge.color };
+    }
     return { label: '👁️ দর্শক', color: '#64748b' };
   };
 
@@ -124,11 +255,15 @@ export default function Sidebar({ isOpen, toggleSidebar }) {
             {adminUser?.name?.charAt(0) || 'A'}
           </div>
           <div style={styles.profileInfo}>
-            <div style={styles.profileName}>{adminUser?.name || 'অ্যাডমিন'}</div>
-            <div style={{
-              ...styles.profileRole,
-              color: roleBadge.color,
-            }}>
+            <div style={styles.profileName}>
+              {adminUser?.name || 'অ্যাডমিন'}
+            </div>
+            <div
+              style={{
+                ...styles.profileRole,
+                color: roleBadge.color,
+              }}
+            >
               <span style={styles.onlineDot}></span>
               {roleBadge.label}
             </div>
@@ -167,7 +302,7 @@ export default function Sidebar({ isOpen, toggleSidebar }) {
         <div style={styles.version}>v1.0.0</div>
       </div>
 
-      {/* ওভারলে */}
+      {/* ওভারলে (মোবাইলের জন্য) */}
       {isMobile && isOpen && (
         <div style={styles.overlay} onClick={toggleSidebar}></div>
       )}
@@ -175,6 +310,9 @@ export default function Sidebar({ isOpen, toggleSidebar }) {
   );
 }
 
+// ============================================
+// স্টাইল (আগের মতোই — অপরিবর্তিত)
+// ============================================
 const styles = {
   sidebar: {
     width: '260px',
