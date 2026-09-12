@@ -76,17 +76,19 @@ export default function TeacherPermissionsModal({
   const loadTeacherData = async () => {
     setLoading(true);
     try {
+      const normalizedEmail = teacher.email.toLowerCase().trim();
+
       // ১. teacher_permissions লোড
       const { data: permData } = await supabase
         .from('teacher_permissions')
         .select('*')
-        .eq('teacher_email', teacher.email);
+        .eq('teacher_email', normalizedEmail);
 
-      // ২. admin_users থেকে বর্তমান রোল লোড
+      // ২. admin_users থেকে বর্তমান রোল লোড (case-insensitive)
       const { data: adminData } = await supabase
         .from('admin_users')
         .select('role')
-        .eq('email', teacher.email)
+        .ilike('email', normalizedEmail)
         .maybeSingle();
 
       const currentRole = adminData?.role || '';
@@ -97,7 +99,7 @@ export default function TeacherPermissionsModal({
         permMap[item.permission_key] = item.is_allowed;
       });
 
-      // ৪. রোল সেট
+      // ৪. রোল সেট (যদি assignable হয়)
       if (currentRole && assignableRoleIds.includes(currentRole)) {
         setSelectedRole(currentRole);
       }
@@ -208,7 +210,7 @@ export default function TeacherPermissionsModal({
       const normalizedEmail = teacher.email.toLowerCase().trim();
 
       // ============================================
-      // ১. admin_users টেবিলে রোল আপডেট/ইনসার্ট
+      // ১. admin_users টেবিলে রোল সেভ (upsert)
       // ============================================
       const { error: adminError } = await supabase
         .from('admin_users')
@@ -224,8 +226,13 @@ export default function TeacherPermissionsModal({
         );
 
       if (adminError) {
-        console.warn('admin_users upsert warning:', adminError.message);
+        console.error('❌ admin_users upsert FAILED:', adminError);
+        throw new Error(
+          'admin_users টেবিলে সেভ করতে সমস্যা: ' + adminError.message
+        );
       }
+
+      console.log('✅ admin_users upserted:', normalizedEmail, '->', selectedRole);
 
       // ============================================
       // ২. teacher_permissions সেভ
@@ -236,7 +243,7 @@ export default function TeacherPermissionsModal({
         .delete()
         .eq('teacher_email', normalizedEmail);
 
-      // নতুন পারমিশন যোগ করি
+      // নতুন পারমিশন যোগ করি (শুধু true গুলো)
       const permRows = Object.entries(selectedPermissions)
         .filter(([_, value]) => value === true)
         .map(([key]) => ({
@@ -256,8 +263,10 @@ export default function TeacherPermissionsModal({
         }
       }
 
+      console.log('✅ teacher_permissions saved:', permRows.length, 'rows');
+
       // ============================================
-      // ৩. লগ তৈরি
+      // ৩. লগ তৈরি (ঐচ্ছিক)
       // ============================================
       try {
         await supabase.from('admin_registration_logs').insert([
@@ -276,10 +285,15 @@ export default function TeacherPermissionsModal({
       }
 
       // ============================================
-      // ✅ সফল
+      // ✅ সফল মেসেজ
       // ============================================
+      const permCount = permRows.length;
+
       setSuccessMessage(
-        `✅ ${teacher.name}-কে ${ROLE_BADGES[selectedRole]?.label || selectedRole} হিসাবে সেট করা হয়েছে!\n\n` +
+        `✅ ${teacher.name}-কে ${
+          ROLE_BADGES[selectedRole]?.label || selectedRole
+        } হিসাবে সেট করা হয়েছে!\n\n` +
+          `📌 পারমিশন: ${permCount} টি\n\n` +
           `📌 এখন থেকে তিনি তার নিজের ইমেইল (${normalizedEmail}) ও পাসওয়ার্ড দিয়ে অ্যাডমিন প্যানেলে লগইন করতে পারবেন।`
       );
 
