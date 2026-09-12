@@ -12,7 +12,7 @@ const SUPER_ADMIN_EMAILS = [
 ];
 
 // ============================================
-// রোল হায়ারার্কি (কারা কাদের বানাতে পারবে)
+// রোল হায়ারার্কি
 // ============================================
 const ROLE_HIERARCHY = {
   super_admin: ['super_admin', 'admin', 'sub_admin', 'teacher'],
@@ -21,9 +21,6 @@ const ROLE_HIERARCHY = {
   teacher: ['teacher'],
 };
 
-// ============================================
-// Provider
-// ============================================
 export function AdminProvider({ children }) {
   const [adminUser, setAdminUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -33,33 +30,40 @@ export function AdminProvider({ children }) {
   }, []);
 
   // ============================================
-  // ইউজারের রোল ও তথ্য লোড
+  // ইউজারের রোল লোড — ⭐ PRIORITY BASED
+  // ক্রম: admin_users → super_admin_email → teachers
   // ============================================
   const loadUserRoleAndPermissions = async (userId, email) => {
     try {
-      const normalizedEmail = email.toLowerCase().trim();
+      const normalizedEmail = (email || '').toLowerCase().trim();
 
-      // ১. admin_users এ চেক
-      const { data: adminData } = await supabase
+      console.log('🔍 Loading role for:', normalizedEmail);
+
+      // ============================================
+      // ১. ⭐ প্রথমে admin_users চেক (সবচেয়ে গুরুত্বপূর্ণ)
+      // ============================================
+      const { data: adminData, error: adminError } = await supabase
         .from('admin_users')
         .select('*')
-        .eq('email', normalizedEmail)
+        .ilike('email', normalizedEmail)
         .maybeSingle();
 
-      if (adminData && adminData.is_active) {
-        console.log('✅ Admin found:', adminData.role);
+      if (adminData) {
+        console.log('✅ Admin found in admin_users:', adminData.role);
         return {
           id: adminData.user_id || userId,
           user_id: adminData.user_id || userId,
-          email: adminData.email,
+          email: adminData.email || normalizedEmail,
           name: adminData.name || 'অ্যাডমিন',
           role: adminData.role,
-          is_active: adminData.is_active,
+          is_active: adminData.is_active !== false,
           created_at: adminData.created_at,
         };
       }
 
-      // ২. Super Admin Email চেক
+      // ============================================
+      // ২. ⭐ Super Admin Email চেক
+      // ============================================
       if (SUPER_ADMIN_EMAILS.includes(normalizedEmail)) {
         console.log('🔥 Super Admin detected by email');
 
@@ -73,7 +77,6 @@ export function AdminProvider({ children }) {
           created_at: new Date().toISOString(),
         };
 
-        // DB-তে সেভ করার চেষ্টা
         try {
           await supabase
             .from('admin_users')
@@ -94,15 +97,17 @@ export function AdminProvider({ children }) {
         return superAdmin;
       }
 
-      // ৩. teachers টেবিলে চেক (শিক্ষক কি না)
+      // ============================================
+      // ৩. teachers টেবিলে চেক (শেষে)
+      // ============================================
       const { data: teacherData } = await supabase
         .from('teachers')
         .select('*')
-        .eq('email', normalizedEmail)
+        .ilike('email', normalizedEmail)
         .maybeSingle();
 
       if (teacherData && teacherData.is_approved) {
-        console.log('✅ Teacher found:', teacherData.name);
+        console.log('👨‍🏫 Teacher found:', teacherData.name);
         return {
           id: userId,
           user_id: userId,
@@ -114,6 +119,7 @@ export function AdminProvider({ children }) {
         };
       }
 
+      console.log('⚠️ No role found for:', normalizedEmail);
       return null;
     } catch (error) {
       console.error('❌ Load user role error:', error);
@@ -181,7 +187,6 @@ export function AdminProvider({ children }) {
         return { success: true };
       }
 
-      // অ্যাক্সেস নেই — সাইন আউট করে দাও
       await supabase.auth.signOut();
       return {
         success: false,
@@ -193,16 +198,13 @@ export function AdminProvider({ children }) {
     }
   };
 
-  // ============================================
-  // লগআউট
-  // ============================================
   const logout = async () => {
     await supabase.auth.signOut();
     setAdminUser(null);
   };
 
   // ============================================
-  // ⭐ এই ইউজার এই রোলটি assign করতে পারবে কি না
+  // রোল ভেরিফিকেশন
   // ============================================
   const canAssignRole = (targetRole) => {
     const myRole = adminUser?.role;
@@ -211,9 +213,6 @@ export function AdminProvider({ children }) {
     return allowed.includes(targetRole);
   };
 
-  // ============================================
-  // ⭐ এই ইউজার যে রোলগুলো assign করতে পারবে
-  // ============================================
   const getAssignableRoles = () => {
     const myRole = adminUser?.role;
     if (!myRole) return [];
@@ -230,7 +229,6 @@ export function AdminProvider({ children }) {
     logout,
     checkSession,
 
-    // অথেনটিকেশন
     isAuthenticated: !!adminUser,
 
     // রোল চেক
@@ -239,14 +237,11 @@ export function AdminProvider({ children }) {
     isSubAdmin: adminUser?.role === 'sub_admin',
     isTeacher: adminUser?.role === 'teacher',
 
-    // ⭐ নতুন ফাংশন
     canAssignRole,
     getAssignableRoles,
 
-    // হায়ারার্কি এক্সপোর্ট (কোডের অন্য জায়গায় লাগতে পারে)
     ROLE_HIERARCHY,
 
-    // পুরোনো কম্প্যাটিবিলিটির জন্য
     isAnyAdmin: ['super_admin', 'admin', 'sub_admin'].includes(
       adminUser?.role
     ),
@@ -257,9 +252,6 @@ export function AdminProvider({ children }) {
   );
 }
 
-// ============================================
-// Hook
-// ============================================
 export function useAdmin() {
   const context = useContext(AdminContext);
   if (!context) {
