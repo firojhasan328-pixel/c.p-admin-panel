@@ -5,9 +5,7 @@ import {
   usePermissions,
   ALL_PERMISSIONS,
   ROLE_BADGES,
-  ROLE_PRIORITY,
 } from '../../hooks/usePermissions';
-import AdminRegistrationModal from './AdminRegistrationModal';
 
 export default function TeacherPermissionsModal({
   teacher,
@@ -16,24 +14,18 @@ export default function TeacherPermissionsModal({
   onSuccess,
 }) {
   const { adminUser, getAssignableRoles } = useAdmin();
-  const {
-    canGrantPermission,
-    getAvailablePermissionsToGrant,
-  } = usePermissions();
+  const { canGrantPermission, getAvailablePermissionsToGrant } = usePermissions();
 
-  // ============================================
-  // State
-  // ============================================
-  const [step, setStep] = useState(1); // 1 = role, 2 = permissions, 3 = registration
+  const [step, setStep] = useState(1); // 1 = role, 2 = permissions
   const [selectedRole, setSelectedRole] = useState('');
   const [selectedPermissions, setSelectedPermissions] = useState({});
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const [showRegistrationModal, setShowRegistrationModal] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
 
   // ============================================
-  // সব রোল অপশন (আপনার রোল অনুযায়ী ফিল্টার হবে)
+  // সব রোল অপশন
   // ============================================
   const ALL_ROLES = [
     {
@@ -62,11 +54,7 @@ export default function TeacherPermissionsModal({
     },
   ];
 
-  // ============================================
-  // আপনি যে রোলগুলো assign করতে পারবেন
-  // ============================================
   const assignableRoleIds = getAssignableRoles();
-
   const availableRoles = ALL_ROLES.filter((r) =>
     assignableRoleIds.includes(r.id)
   );
@@ -78,6 +66,7 @@ export default function TeacherPermissionsModal({
     if (isOpen && teacher) {
       setStep(1);
       setError('');
+      setSuccessMessage('');
       setSelectedRole('');
       setSelectedPermissions({});
       loadTeacherData();
@@ -102,20 +91,13 @@ export default function TeacherPermissionsModal({
 
       const currentRole = adminData?.role || '';
 
-      // ৩. পারমিশন ম্যাপ তৈরি
+      // ৩. পারমিশন ম্যাপ
       const permMap = {};
       (permData || []).forEach((item) => {
         permMap[item.permission_key] = item.is_allowed;
       });
 
-      // ৪. যদি রোল থাকে কিন্তু সেটা আপনার assign করার যোগ্য না হয়
-      if (currentRole && !assignableRoleIds.includes(currentRole)) {
-        setError(
-          '⚠️ এই শিক্ষকের বর্তমান রোল আপনার নিয়ন্ত্রণাধীন নয়। আপনি কেবল নিচের ভূমিকা থেকে নির্বাচন করতে পারবেন।'
-        );
-      }
-
-      // ৫. সেট করা
+      // ৪. রোল সেট
       if (currentRole && assignableRoleIds.includes(currentRole)) {
         setSelectedRole(currentRole);
       }
@@ -128,7 +110,7 @@ export default function TeacherPermissionsModal({
   };
 
   // ============================================
-  // স্টেপ ১ → ২: রোল সিলেক্ট করে পরবর্তী
+  // স্টেপ ১ → ২
   // ============================================
   const handleNext = () => {
     if (!selectedRole) {
@@ -140,26 +122,21 @@ export default function TeacherPermissionsModal({
   };
 
   // ============================================
-  // রোল সিলেক্ট করলে ডিফল্ট পারমিশন বসাও
+  // রোল সিলেক্ট
   // ============================================
   const handleRoleSelect = (roleId) => {
     setSelectedRole(roleId);
     setError('');
 
-    // ============================================
-    // ডিফল্ট পারমিশন (আপনার দেওয়ার যোগ্য শুধু)
-    // ============================================
     const grantablePerms = getAvailablePermissionsToGrant().map((p) => p.key);
 
     const defaultPerms = {};
     ALL_PERMISSIONS.forEach((p) => {
-      // আপনার দেওয়ার যোগ্য না হলে সবসময় false
       if (!grantablePerms.includes(p.key)) {
         defaultPerms[p.key] = false;
         return;
       }
 
-      // আপনার রোল অনুযায়ী ডিফল্ট
       if (roleId === 'super_admin') {
         defaultPerms[p.key] = true;
       } else if (roleId === 'admin') {
@@ -202,9 +179,6 @@ export default function TeacherPermissionsModal({
     setError('');
   };
 
-  // ============================================
-  // সব পারমিশন টগল
-  // ============================================
   const handleToggleAll = (category, isChecked) => {
     const grantablePerms = getAvailablePermissionsToGrant().map((p) => p.key);
     const categoryPerms = ALL_PERMISSIONS.filter(
@@ -219,30 +193,108 @@ export default function TeacherPermissionsModal({
   };
 
   // ============================================
-  // স্টেপ ২ → ৩: রেজিস্ট্রেশন পপআপ খোলা
+  // ✅ সংরক্ষণ — সরাসরি DB-তে
   // ============================================
-  const handleSaveClick = () => {
+  const handleSave = async () => {
     if (!selectedRole) {
       setError('দয়া করে একটি রোল সিলেক্ট করুন');
       return;
     }
+
+    setSaving(true);
     setError('');
-    setShowRegistrationModal(true);
+
+    try {
+      const normalizedEmail = teacher.email.toLowerCase().trim();
+
+      // ============================================
+      // ১. admin_users টেবিলে রোল আপডেট/ইনসার্ট
+      // ============================================
+      const { error: adminError } = await supabase
+        .from('admin_users')
+        .upsert(
+          {
+            email: normalizedEmail,
+            name: teacher.name || 'শিক্ষক',
+            role: selectedRole,
+            is_active: true,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: 'email' }
+        );
+
+      if (adminError) {
+        console.warn('admin_users upsert warning:', adminError.message);
+      }
+
+      // ============================================
+      // ২. teacher_permissions সেভ
+      // ============================================
+      // পুরোনো পারমিশন মুছে ফেলি
+      await supabase
+        .from('teacher_permissions')
+        .delete()
+        .eq('teacher_email', normalizedEmail);
+
+      // নতুন পারমিশন যোগ করি
+      const permRows = Object.entries(selectedPermissions)
+        .filter(([_, value]) => value === true)
+        .map(([key]) => ({
+          teacher_email: normalizedEmail,
+          permission_key: key,
+          is_allowed: true,
+          granted_by: null,
+        }));
+
+      if (permRows.length > 0) {
+        const { error: permError } = await supabase
+          .from('teacher_permissions')
+          .insert(permRows);
+
+        if (permError) {
+          throw new Error('পারমিশন সেভ সমস্যা: ' + permError.message);
+        }
+      }
+
+      // ============================================
+      // ৩. লগ তৈরি
+      // ============================================
+      try {
+        await supabase.from('admin_registration_logs').insert([
+          {
+            admin_user_id: null,
+            email: normalizedEmail,
+            name: teacher.name || 'শিক্ষক',
+            role: selectedRole,
+            assigned_by_email: adminUser?.email || 'system',
+            assigned_by_role: adminUser?.role || 'system',
+            assigned_permissions: selectedPermissions || {},
+          },
+        ]);
+      } catch (logErr) {
+        console.warn('Log insert warning:', logErr);
+      }
+
+      // ============================================
+      // ✅ সফল
+      // ============================================
+      setSuccessMessage(
+        `✅ ${teacher.name}-কে ${ROLE_BADGES[selectedRole]?.label || selectedRole} হিসাবে সেট করা হয়েছে!\n\n` +
+          `📌 এখন থেকে তিনি তার নিজের ইমেইল (${normalizedEmail}) ও পাসওয়ার্ড দিয়ে অ্যাডমিন প্যানেলে লগইন করতে পারবেন।`
+      );
+
+      setTimeout(() => {
+        onSuccess?.();
+        onClose();
+      }, 3500);
+    } catch (err) {
+      console.error('❌ Save error:', err);
+      setError('❌ ' + (err.message || 'সংরক্ষণ করতে সমস্যা হয়েছে'));
+    } finally {
+      setSaving(false);
+    }
   };
 
-  // ============================================
-  // রেজিস্ট্রেশন সফল হলে
-  // ============================================
-  const handleRegistrationSuccess = () => {
-    setShowRegistrationModal(false);
-    setSaving(false);
-    onSuccess?.();
-    onClose();
-  };
-
-  // ============================================
-  // Back
-  // ============================================
   const handleBack = () => {
     if (step === 2) {
       setStep(1);
@@ -250,9 +302,6 @@ export default function TeacherPermissionsModal({
     }
   };
 
-  // ============================================
-  // Close
-  // ============================================
   const handleClose = () => {
     if (saving || loading) return;
     onClose();
@@ -261,7 +310,7 @@ export default function TeacherPermissionsModal({
   if (!isOpen || !teacher) return null;
 
   // ============================================
-  // পারমিশন গ্রুপ (শুধু আপনার দেওয়ার যোগ্য)
+  // পারমিশন গ্রুপ
   // ============================================
   const grantablePermissionKeys = getAvailablePermissionsToGrant().map(
     (p) => p.key
@@ -275,287 +324,281 @@ export default function TeacherPermissionsModal({
     groupedPermissions[p.category].push(p);
   });
 
-  // ============================================
-  // Render
-  // ============================================
   return (
     <>
       <div style={styles.overlay} onClick={handleClose}>
         <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
-          {/* হেডার */}
-          <div style={styles.header}>
-            <h3 style={styles.title}>
-              {step === 1 && '🔐 রোল সিলেক্ট করুন'}
-              {step === 2 && `🔐 ${teacher?.name} - পারমিশন`}
-            </h3>
-            <button onClick={handleClose} style={styles.closeBtn}>
-              ✕
-            </button>
-          </div>
-
-          {/* সাব-হেডার */}
-          <div style={styles.subHeader}>
-            <span style={styles.email}>📧 {teacher?.email}</span>
-            {selectedRole && (
-              <span
-                style={{
-                  ...styles.roleBadge,
-                  background:
-                    ROLE_BADGES[selectedRole]?.bg || '#f1f5f9',
-                  color: ROLE_BADGES[selectedRole]?.color || '#64748b',
-                }}
-              >
-                {ROLE_BADGES[selectedRole]?.label || selectedRole}
-              </span>
-            )}
-          </div>
-
-          {/* স্টেপ ইন্ডিকেটর */}
-          <div style={styles.stepIndicator}>
-            <div
-              style={{
-                ...styles.stepDot,
-                background: step >= 1 ? '#16a34a' : '#e2e8f0',
-              }}
-            >
-              1
+          {/* সফল অবস্থা */}
+          {successMessage ? (
+            <div style={styles.successContainer}>
+              <div style={styles.successIcon}>🎉</div>
+              <h2 style={styles.successTitle}>সফলভাবে সংরক্ষণ হয়েছে!</h2>
+              <pre style={styles.successText}>{successMessage}</pre>
+              <p style={styles.successFooter}>
+                ⏳ পপআপ স্বয়ংক্রিয়ভাবে বন্ধ হবে...
+              </p>
             </div>
-            <div
-              style={{
-                ...styles.stepLine,
-                background: step >= 2 ? '#16a34a' : '#e2e8f0',
-              }}
-            />
-            <div
-              style={{
-                ...styles.stepDot,
-                background: step >= 2 ? '#16a34a' : '#e2e8f0',
-              }}
-            >
-              2
-            </div>
-            <div
-              style={{
-                ...styles.stepLine,
-                background: step >= 3 ? '#16a34a' : '#e2e8f0',
-              }}
-            />
-            <div
-              style={{
-                ...styles.stepDot,
-                background: step >= 3 ? '#16a34a' : '#e2e8f0',
-              }}
-            >
-              3
-            </div>
-          </div>
-
-          {/* এরর */}
-          {error && <div style={styles.errorBox}>{error}</div>}
-
-          {/* Loading */}
-          {loading ? (
-            <div style={styles.loading}>⏳ লোড হচ্ছে...</div>
           ) : (
             <>
-              {/* ============================================
-                  স্টেপ ১: রোল সিলেক্ট
-                  ============================================ */}
-              {step === 1 && (
-                <div style={styles.step1Container}>
-                  <p style={styles.step1Hint}>
-                    এই শিক্ষককে কী ধরনের অ্যাক্সেস দিতে চান?
-                  </p>
+              {/* হেডার */}
+              <div style={styles.header}>
+                <h3 style={styles.title}>
+                  {step === 1 && '🔐 রোল সিলেক্ট করুন'}
+                  {step === 2 && `🔐 ${teacher?.name} - পারমিশন`}
+                </h3>
+                <button onClick={handleClose} style={styles.closeBtn}>
+                  ✕
+                </button>
+              </div>
 
-                  {availableRoles.length === 0 ? (
-                    <div style={styles.noRolesBox}>
-                      ⚠️ আপনার এই মুহূর্তে কোনো রোল দেওয়ার অনুমতি নেই।
-                    </div>
-                  ) : (
-                    <div style={styles.roleList}>
-                      {availableRoles.map((role) => (
-                        <div
-                          key={role.id}
-                          style={{
-                            ...styles.roleCard,
-                            ...(selectedRole === role.id
-                              ? styles.roleCardActive
-                              : {}),
-                          }}
-                          onClick={() => handleRoleSelect(role.id)}
-                        >
-                          <div style={styles.roleCardLeft}>
-                            <span style={styles.roleIcon}>{role.icon}</span>
-                            <div>
-                              <div style={styles.roleLabel}>{role.label}</div>
-                              <div style={styles.roleDesc}>{role.desc}</div>
-                            </div>
-                          </div>
-                          {selectedRole === role.id && (
-                            <span style={styles.roleCheck}>✅</span>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
+              {/* সাব-হেডার */}
+              <div style={styles.subHeader}>
+                <span style={styles.email}>📧 {teacher?.email}</span>
+                {selectedRole && (
+                  <span
+                    style={{
+                      ...styles.roleBadge,
+                      background: ROLE_BADGES[selectedRole]?.bg || '#f1f5f9',
+                      color: ROLE_BADGES[selectedRole]?.color || '#64748b',
+                    }}
+                  >
+                    {ROLE_BADGES[selectedRole]?.label || selectedRole}
+                  </span>
+                )}
+              </div>
+
+              {/* স্টেপ ইন্ডিকেটর */}
+              <div style={styles.stepIndicator}>
+                <div
+                  style={{
+                    ...styles.stepDot,
+                    background: step >= 1 ? '#16a34a' : '#e2e8f0',
+                  }}
+                >
+                  1
                 </div>
-              )}
+                <div
+                  style={{
+                    ...styles.stepLine,
+                    background: step >= 2 ? '#16a34a' : '#e2e8f0',
+                  }}
+                />
+                <div
+                  style={{
+                    ...styles.stepDot,
+                    background: step >= 2 ? '#16a34a' : '#e2e8f0',
+                  }}
+                >
+                  2
+                </div>
+              </div>
 
-              {/* ============================================
-                  স্টেপ ২: পারমিশন
-                  ============================================ */}
-              {step === 2 && (
-                <div style={styles.permissionsContainer}>
-                  <div style={styles.permissionInfoBox}>
-                    💡 আপনি কেবল সেই পারমিশনগুলো দিতে পারবেন যেগুলো
-                    আপনার কাছেই আছে।
-                  </div>
+              {error && <div style={styles.errorBox}>{error}</div>}
 
-                  <div style={styles.permissionsList}>
-                    {Object.entries(groupedPermissions).map(
-                      ([category, perms]) => {
-                        // এই ক্যাটাগরিতে আপনার দেওয়ার যোগ্য কতটি আছে
-                        const grantableInCategory = perms.filter((p) =>
-                          grantablePermissionKeys.includes(p.key)
-                        );
+              {loading ? (
+                <div style={styles.loading}>⏳ লোড হচ্ছে...</div>
+              ) : (
+                <>
+                  {/* ============================================
+                      স্টেপ ১: রোল সিলেক্ট
+                      ============================================ */}
+                  {step === 1 && (
+                    <div style={styles.step1Container}>
+                      <p style={styles.step1Hint}>
+                        এই শিক্ষককে কী ধরনের অ্যাক্সেস দিতে চান?
+                      </p>
 
-                        const allChecked =
-                          grantableInCategory.length > 0 &&
-                          grantableInCategory.every(
-                            (p) => selectedPermissions[p.key] === true
-                          );
-
-                        return (
-                          <div key={category} style={styles.categoryGroup}>
-                            <div style={styles.categoryHeader}>
-                              <h4 style={styles.categoryTitle}>
-                                {category}
-                              </h4>
-                              {grantableInCategory.length > 0 && (
-                                <label style={styles.toggleAllLabel}>
-                                  <input
-                                    type="checkbox"
-                                    checked={allChecked}
-                                    onChange={(e) =>
-                                      handleToggleAll(
-                                        category,
-                                        e.target.checked
-                                      )
-                                    }
-                                    style={styles.toggleAllCheckbox}
-                                  />
-                                  <span style={styles.toggleAllText}>
-                                    সব
-                                  </span>
-                                </label>
+                      {availableRoles.length === 0 ? (
+                        <div style={styles.noRolesBox}>
+                          ⚠️ আপনার এই মুহূর্তে কোনো রোল দেওয়ার অনুমতি নেই।
+                        </div>
+                      ) : (
+                        <div style={styles.roleList}>
+                          {availableRoles.map((role) => (
+                            <div
+                              key={role.id}
+                              style={{
+                                ...styles.roleCard,
+                                ...(selectedRole === role.id
+                                  ? styles.roleCardActive
+                                  : {}),
+                              }}
+                              onClick={() => handleRoleSelect(role.id)}
+                            >
+                              <div style={styles.roleCardLeft}>
+                                <span style={styles.roleIcon}>{role.icon}</span>
+                                <div>
+                                  <div style={styles.roleLabel}>
+                                    {role.label}
+                                  </div>
+                                  <div style={styles.roleDesc}>
+                                    {role.desc}
+                                  </div>
+                                </div>
+                              </div>
+                              {selectedRole === role.id && (
+                                <span style={styles.roleCheck}>✅</span>
                               )}
                             </div>
+                          ))}
+                        </div>
+                      )}
 
-                            {perms.map((perm) => {
-                              const isGrantable =
-                                grantablePermissionKeys.includes(perm.key);
-                              const isChecked =
-                                selectedPermissions[perm.key] === true;
-                              const canChange =
-                                canGrantPermission(perm.key) ||
-                                selectedRole === 'super_admin';
+                      <div style={styles.infoNote}>
+                        💡 শিক্ষক তার নিজের ইমেইল ও পাসওয়ার্ড দিয়েই অ্যাডমিন
+                        প্যানেলে লগইন করতে পারবেন — নতুন পাসওয়ার্ড সেট করার
+                        দরকার নেই।
+                      </div>
+                    </div>
+                  )}
 
-                              return (
-                                <label
-                                  key={perm.key}
-                                  style={{
-                                    ...styles.permissionItem,
-                                    opacity: isGrantable ? 1 : 0.4,
-                                    cursor: isGrantable
-                                      ? 'pointer'
-                                      : 'not-allowed',
-                                  }}
-                                >
-                                  <input
-                                    type="checkbox"
-                                    checked={isChecked && isGrantable}
-                                    onChange={(e) =>
-                                      handlePermissionChange(
-                                        perm.key,
-                                        e.target.checked
-                                      )
-                                    }
-                                    disabled={!isGrantable || !canChange}
-                                    style={styles.checkbox}
-                                  />
-                                  <span style={styles.permissionLabel}>
-                                    {perm.label}
-                                  </span>
-                                  {!isGrantable && (
-                                    <span style={styles.lockedIcon}>
-                                      🔒
-                                    </span>
-                                  )}
-                                </label>
+                  {/* ============================================
+                      স্টেপ ২: পারমিশন
+                      ============================================ */}
+                  {step === 2 && (
+                    <div style={styles.permissionsContainer}>
+                      <div style={styles.permissionInfoBox}>
+                        💡 আপনি কেবল সেই পারমিশনগুলো দিতে পারবেন যেগুলো আপনার
+                        কাছেই আছে।
+                      </div>
+
+                      <div style={styles.permissionsList}>
+                        {Object.entries(groupedPermissions).map(
+                          ([category, perms]) => {
+                            const grantableInCategory = perms.filter((p) =>
+                              grantablePermissionKeys.includes(p.key)
+                            );
+
+                            const allChecked =
+                              grantableInCategory.length > 0 &&
+                              grantableInCategory.every(
+                                (p) => selectedPermissions[p.key] === true
                               );
-                            })}
-                          </div>
-                        );
-                      }
-                    )}
-                  </div>
-                </div>
+
+                            return (
+                              <div
+                                key={category}
+                                style={styles.categoryGroup}
+                              >
+                                <div style={styles.categoryHeader}>
+                                  <h4 style={styles.categoryTitle}>
+                                    {category}
+                                  </h4>
+                                  {grantableInCategory.length > 0 && (
+                                    <label style={styles.toggleAllLabel}>
+                                      <input
+                                        type="checkbox"
+                                        checked={allChecked}
+                                        onChange={(e) =>
+                                          handleToggleAll(
+                                            category,
+                                            e.target.checked
+                                          )
+                                        }
+                                        style={styles.toggleAllCheckbox}
+                                      />
+                                      <span style={styles.toggleAllText}>
+                                        সব
+                                      </span>
+                                    </label>
+                                  )}
+                                </div>
+
+                                {perms.map((perm) => {
+                                  const isGrantable =
+                                    grantablePermissionKeys.includes(
+                                      perm.key
+                                    );
+                                  const isChecked =
+                                    selectedPermissions[perm.key] === true;
+                                  const canChange = canGrantPermission(perm.key);
+
+                                  return (
+                                    <label
+                                      key={perm.key}
+                                      style={{
+                                        ...styles.permissionItem,
+                                        opacity: isGrantable ? 1 : 0.4,
+                                        cursor: isGrantable
+                                          ? 'pointer'
+                                          : 'not-allowed',
+                                      }}
+                                    >
+                                      <input
+                                        type="checkbox"
+                                        checked={isChecked && isGrantable}
+                                        onChange={(e) =>
+                                          handlePermissionChange(
+                                            perm.key,
+                                            e.target.checked
+                                          )
+                                        }
+                                        disabled={!isGrantable || !canChange}
+                                        style={styles.checkbox}
+                                      />
+                                      <span style={styles.permissionLabel}>
+                                        {perm.label}
+                                      </span>
+                                      {!isGrantable && (
+                                        <span style={styles.lockedIcon}>
+                                          🔒
+                                        </span>
+                                      )}
+                                    </label>
+                                  );
+                                })}
+                              </div>
+                            );
+                          }
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
+
+              {/* ফুটার */}
+              <div style={styles.footer}>
+                {step === 1 && (
+                  <>
+                    <button onClick={handleClose} style={styles.cancelBtn}>
+                      ❌ বাতিল
+                    </button>
+                    <button
+                      onClick={handleNext}
+                      disabled={!selectedRole || loading}
+                      style={{
+                        ...styles.nextBtn,
+                        opacity: !selectedRole || loading ? 0.5 : 1,
+                      }}
+                    >
+                      পরবর্তী →
+                    </button>
+                  </>
+                )}
+
+                {step === 2 && (
+                  <>
+                    <button onClick={handleBack} style={styles.backBtn}>
+                      ← আগের ধাপ
+                    </button>
+                    <button
+                      onClick={handleSave}
+                      disabled={saving || loading}
+                      style={{
+                        ...styles.saveBtn,
+                        opacity: saving || loading ? 0.6 : 1,
+                      }}
+                    >
+                      {saving ? '⏳ সংরক্ষণ...' : '💾 সংরক্ষণ করুন'}
+                    </button>
+                  </>
+                )}
+              </div>
             </>
           )}
-
-          {/* ফুটার বাটন */}
-          <div style={styles.footer}>
-            {step === 1 && (
-              <>
-                <button onClick={handleClose} style={styles.cancelBtn}>
-                  ❌ বাতিল
-                </button>
-                <button
-                  onClick={handleNext}
-                  disabled={!selectedRole || loading}
-                  style={{
-                    ...styles.nextBtn,
-                    opacity: !selectedRole || loading ? 0.5 : 1,
-                  }}
-                >
-                  পরবর্তী →
-                </button>
-              </>
-            )}
-
-            {step === 2 && (
-              <>
-                <button onClick={handleBack} style={styles.backBtn}>
-                  ← আগের ধাপ
-                </button>
-                <button
-                  onClick={handleSaveClick}
-                  disabled={saving || loading}
-                  style={{
-                    ...styles.saveBtn,
-                    opacity: saving || loading ? 0.6 : 1,
-                  }}
-                >
-                  {saving ? '⏳ সংরক্ষণ...' : '💾 সংরক্ষণ করুন'}
-                </button>
-              </>
-            )}
-          </div>
         </div>
       </div>
-
-      {/* ============================================
-          অ্যাডমিন রেজিস্ট্রেশন মোডাল
-          ============================================ */}
-      <AdminRegistrationModal
-        isOpen={showRegistrationModal}
-        onClose={() => setShowRegistrationModal(false)}
-        teacher={teacher}
-        selectedRole={selectedRole}
-        selectedPermissions={selectedPermissions}
-        onSuccess={handleRegistrationSuccess}
-      />
     </>
   );
 }
@@ -620,11 +663,7 @@ const styles = {
     flexWrap: 'wrap',
     gap: '8px',
   },
-  email: {
-    fontSize: '12px',
-    color: '#64748b',
-    fontWeight: '500',
-  },
+  email: { fontSize: '12px', color: '#64748b', fontWeight: '500' },
   roleBadge: {
     fontSize: '11px',
     fontWeight: '600',
@@ -652,7 +691,7 @@ const styles = {
     transition: 'all 0.3s ease',
   },
   stepLine: {
-    width: '60px',
+    width: '80px',
     height: '3px',
     background: '#e2e8f0',
     transition: 'all 0.3s ease',
@@ -672,15 +711,8 @@ const styles = {
     color: '#94a3b8',
     fontSize: '15px',
   },
-  step1Container: {
-    padding: '16px 22px',
-    overflowY: 'auto',
-  },
-  step1Hint: {
-    fontSize: '13px',
-    color: '#64748b',
-    margin: '0 0 14px 0',
-  },
+  step1Container: { padding: '16px 22px', overflowY: 'auto' },
+  step1Hint: { fontSize: '13px', color: '#64748b', margin: '0 0 14px 0' },
   noRolesBox: {
     background: '#fef3c7',
     color: '#92400e',
@@ -689,11 +721,7 @@ const styles = {
     fontSize: '13px',
     textAlign: 'center',
   },
-  roleList: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '10px',
-  },
+  roleList: { display: 'flex', flexDirection: 'column', gap: '10px' },
   roleCard: {
     display: 'flex',
     justifyContent: 'space-between',
@@ -704,30 +732,21 @@ const styles = {
     cursor: 'pointer',
     transition: 'all 0.2s ease',
   },
-  roleCardActive: {
-    borderColor: '#16a34a',
-    background: '#f0fdf4',
-  },
-  roleCardLeft: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '14px',
-  },
-  roleIcon: {
-    fontSize: '26px',
-  },
-  roleLabel: {
-    fontSize: '15px',
-    fontWeight: '600',
-    color: '#0f172a',
-  },
-  roleDesc: {
+  roleCardActive: { borderColor: '#16a34a', background: '#f0fdf4' },
+  roleCardLeft: { display: 'flex', alignItems: 'center', gap: '14px' },
+  roleIcon: { fontSize: '26px' },
+  roleLabel: { fontSize: '15px', fontWeight: '600', color: '#0f172a' },
+  roleDesc: { fontSize: '12px', color: '#94a3b8', marginTop: '2px' },
+  roleCheck: { fontSize: '18px' },
+  infoNote: {
+    marginTop: '16px',
+    padding: '10px 14px',
+    background: '#eff6ff',
+    borderRadius: '10px',
     fontSize: '12px',
-    color: '#94a3b8',
-    marginTop: '2px',
-  },
-  roleCheck: {
-    fontSize: '18px',
+    color: '#1e40af',
+    borderLeft: '4px solid #3b82f6',
+    lineHeight: '1.6',
   },
   permissionsContainer: {
     padding: '14px 22px',
@@ -743,15 +762,8 @@ const styles = {
     marginBottom: '14px',
     borderLeft: '4px solid #0ea5e9',
   },
-  permissionsList: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '14px',
-  },
-  categoryGroup: {
-    paddingBottom: '10px',
-    borderBottom: '1px solid #f1f5f9',
-  },
+  permissionsList: { display: 'flex', flexDirection: 'column', gap: '14px' },
+  categoryGroup: { paddingBottom: '10px', borderBottom: '1px solid #f1f5f9' },
   categoryHeader: {
     display: 'flex',
     justifyContent: 'space-between',
@@ -781,9 +793,7 @@ const styles = {
     cursor: 'pointer',
     accentColor: '#16a34a',
   },
-  toggleAllText: {
-    fontSize: '11px',
-  },
+  toggleAllText: { fontSize: '11px' },
   permissionItem: {
     display: 'flex',
     alignItems: 'center',
@@ -798,16 +808,8 @@ const styles = {
     accentColor: '#16a34a',
     flexShrink: 0,
   },
-  permissionLabel: {
-    fontSize: '13px',
-    color: '#0f172a',
-    fontWeight: '500',
-  },
-  lockedIcon: {
-    fontSize: '14px',
-    color: '#94a3b8',
-    marginLeft: 'auto',
-  },
+  permissionLabel: { fontSize: '13px', color: '#0f172a', fontWeight: '500' },
+  lockedIcon: { fontSize: '14px', color: '#94a3b8', marginLeft: 'auto' },
   footer: {
     display: 'flex',
     justifyContent: 'flex-end',
@@ -857,4 +859,26 @@ const styles = {
     cursor: 'pointer',
     boxShadow: '0 4px 12px rgba(22,163,74,0.3)',
   },
+  successContainer: { textAlign: 'center', padding: '30px 20px' },
+  successIcon: { fontSize: '56px', marginBottom: '12px' },
+  successTitle: {
+    fontSize: '20px',
+    fontWeight: '700',
+    color: '#0f172a',
+    margin: '0 0 16px 0',
+  },
+  successText: {
+    fontSize: '14px',
+    color: '#475569',
+    textAlign: 'left',
+    background: '#f0fdf4',
+    padding: '14px 16px',
+    borderRadius: '12px',
+    border: '1px solid #bbf7d0',
+    lineHeight: '1.8',
+    fontFamily: 'inherit',
+    whiteSpace: 'pre-wrap',
+    margin: '0 0 16px 0',
+  },
+  successFooter: { fontSize: '12px', color: '#94a3b8', margin: 0 },
 };
