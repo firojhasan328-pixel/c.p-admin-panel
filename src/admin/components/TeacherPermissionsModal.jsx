@@ -16,7 +16,7 @@ export default function TeacherPermissionsModal({
   const { adminUser, getAssignableRoles } = useAdmin();
   const { canGrantPermission, getAvailablePermissionsToGrant } = usePermissions();
 
-  const [step, setStep] = useState(1); // 1 = role, 2 = permissions
+  const [step, setStep] = useState(1);
   const [selectedRole, setSelectedRole] = useState('');
   const [selectedPermissions, setSelectedPermissions] = useState({});
   const [loading, setLoading] = useState(false);
@@ -25,7 +25,8 @@ export default function TeacherPermissionsModal({
   const [successMessage, setSuccessMessage] = useState('');
 
   // ============================================
-  // সব রোল অপশন
+  // ✅ সব রোল অপশন — শিক্ষক বাদ দেওয়া হয়েছে
+  // কারণ শিক্ষক রোল শুধু শিক্ষক রেজিস্ট্রেশন দিয়ে দেওয়া হয়
   // ============================================
   const ALL_ROLES = [
     {
@@ -46,12 +47,7 @@ export default function TeacherPermissionsModal({
       desc: 'আরো সীমিত নিয়ন্ত্রণ',
       icon: '🔷',
     },
-    {
-      id: 'teacher',
-      label: '👨‍🏫 শিক্ষক',
-      desc: 'মৌলিক অ্যাক্সেস',
-      icon: '👨‍🏫',
-    },
+    // ❌ teacher বাদ দেওয়া হয়েছে
   ];
 
   const assignableRoleIds = getAssignableRoles();
@@ -78,13 +74,13 @@ export default function TeacherPermissionsModal({
     try {
       const normalizedEmail = teacher.email.toLowerCase().trim();
 
-      // ১. teacher_permissions লোড
+      // teacher_permissions লোড
       const { data: permData } = await supabase
         .from('teacher_permissions')
         .select('*')
         .eq('teacher_email', normalizedEmail);
 
-      // ২. admin_users থেকে বর্তমান রোল লোড (case-insensitive)
+      // admin_users থেকে বর্তমান রোল লোড
       const { data: adminData } = await supabase
         .from('admin_users')
         .select('role')
@@ -93,13 +89,12 @@ export default function TeacherPermissionsModal({
 
       const currentRole = adminData?.role || '';
 
-      // ৩. পারমিশন ম্যাপ
       const permMap = {};
       (permData || []).forEach((item) => {
         permMap[item.permission_key] = item.is_allowed;
       });
 
-      // ৪. রোল সেট (যদি assignable হয়)
+      // রোল সেট — শুধু assignable রোল হলে
       if (currentRole && assignableRoleIds.includes(currentRole)) {
         setSelectedRole(currentRole);
       }
@@ -111,9 +106,6 @@ export default function TeacherPermissionsModal({
     setLoading(false);
   };
 
-  // ============================================
-  // স্টেপ ১ → ২
-  // ============================================
   const handleNext = () => {
     if (!selectedRole) {
       setError('দয়া করে একটি রোল সিলেক্ট করুন');
@@ -123,9 +115,6 @@ export default function TeacherPermissionsModal({
     setStep(2);
   };
 
-  // ============================================
-  // রোল সিলেক্ট
-  // ============================================
   const handleRoleSelect = (roleId) => {
     setSelectedRole(roleId);
     setError('');
@@ -166,9 +155,6 @@ export default function TeacherPermissionsModal({
     setSelectedPermissions(defaultPerms);
   };
 
-  // ============================================
-  // পারমিশন টগল
-  // ============================================
   const handlePermissionChange = (permissionKey, isAllowed) => {
     if (!canGrantPermission(permissionKey)) {
       setError('আপনার এই পারমিশন দেওয়ার অনুমতি নেই');
@@ -195,7 +181,7 @@ export default function TeacherPermissionsModal({
   };
 
   // ============================================
-  // ✅ সংরক্ষণ — সরাসরি DB-তে
+  // ✅ সংরক্ষণ
   // ============================================
   const handleSave = async () => {
     if (!selectedRole) {
@@ -209,9 +195,7 @@ export default function TeacherPermissionsModal({
     try {
       const normalizedEmail = teacher.email.toLowerCase().trim();
 
-      // ============================================
-      // ১. admin_users টেবিলে রোল সেভ (upsert)
-      // ============================================
+      // admin_users টেবিলে রোল সেভ
       const { error: adminError } = await supabase
         .from('admin_users')
         .upsert(
@@ -232,18 +216,12 @@ export default function TeacherPermissionsModal({
         );
       }
 
-      console.log('✅ admin_users upserted:', normalizedEmail, '->', selectedRole);
-
-      // ============================================
-      // ২. teacher_permissions সেভ
-      // ============================================
-      // পুরোনো পারমিশন মুছে ফেলি
+      // teacher_permissions সেভ
       await supabase
         .from('teacher_permissions')
         .delete()
         .eq('teacher_email', normalizedEmail);
 
-      // নতুন পারমিশন যোগ করি (শুধু true গুলো)
       const permRows = Object.entries(selectedPermissions)
         .filter(([_, value]) => value === true)
         .map(([key]) => ({
@@ -263,11 +241,7 @@ export default function TeacherPermissionsModal({
         }
       }
 
-      console.log('✅ teacher_permissions saved:', permRows.length, 'rows');
-
-      // ============================================
-      // ৩. লগ তৈরি (ঐচ্ছিক)
-      // ============================================
+      // লগ তৈরি
       try {
         await supabase.from('admin_registration_logs').insert([
           {
@@ -284,9 +258,6 @@ export default function TeacherPermissionsModal({
         console.warn('Log insert warning:', logErr);
       }
 
-      // ============================================
-      // ✅ সফল মেসেজ
-      // ============================================
       const permCount = permRows.length;
 
       setSuccessMessage(
@@ -323,9 +294,6 @@ export default function TeacherPermissionsModal({
 
   if (!isOpen || !teacher) return null;
 
-  // ============================================
-  // পারমিশন গ্রুপ
-  // ============================================
   const grantablePermissionKeys = getAvailablePermissionsToGrant().map(
     (p) => p.key
   );
@@ -342,7 +310,6 @@ export default function TeacherPermissionsModal({
     <>
       <div style={styles.overlay} onClick={handleClose}>
         <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
-          {/* সফল অবস্থা */}
           {successMessage ? (
             <div style={styles.successContainer}>
               <div style={styles.successIcon}>🎉</div>
@@ -354,7 +321,6 @@ export default function TeacherPermissionsModal({
             </div>
           ) : (
             <>
-              {/* হেডার */}
               <div style={styles.header}>
                 <h3 style={styles.title}>
                   {step === 1 && '🔐 রোল সিলেক্ট করুন'}
@@ -365,7 +331,6 @@ export default function TeacherPermissionsModal({
                 </button>
               </div>
 
-              {/* সাব-হেডার */}
               <div style={styles.subHeader}>
                 <span style={styles.email}>📧 {teacher?.email}</span>
                 {selectedRole && (
@@ -381,7 +346,6 @@ export default function TeacherPermissionsModal({
                 )}
               </div>
 
-              {/* স্টেপ ইন্ডিকেটর */}
               <div style={styles.stepIndicator}>
                 <div
                   style={{
@@ -413,9 +377,6 @@ export default function TeacherPermissionsModal({
                 <div style={styles.loading}>⏳ লোড হচ্ছে...</div>
               ) : (
                 <>
-                  {/* ============================================
-                      স্টেপ ১: রোল সিলেক্ট
-                      ============================================ */}
                   {step === 1 && (
                     <div style={styles.step1Container}>
                       <p style={styles.step1Hint}>
@@ -459,16 +420,13 @@ export default function TeacherPermissionsModal({
                       )}
 
                       <div style={styles.infoNote}>
-                        💡 শিক্ষক তার নিজের ইমেইল ও পাসওয়ার্ড দিয়েই অ্যাডমিন
-                        প্যানেলে লগইন করতে পারবেন — নতুন পাসওয়ার্ড সেট করার
-                        দরকার নেই।
+                        💡 শিক্ষক রোল ওয়েবসাইটের রেজিস্ট্রেশনের মাধ্যমে দেওয়া
+                        হয়। এখান থেকে শুধু অ্যাডমিন, সাব-অ্যাডমিন বা সুপার
+                        অ্যাডমিন রোল দেওয়া যায়।
                       </div>
                     </div>
                   )}
 
-                  {/* ============================================
-                      স্টেপ ২: পারমিশন
-                      ============================================ */}
                   {step === 2 && (
                     <div style={styles.permissionsContainer}>
                       <div style={styles.permissionInfoBox}>
@@ -571,7 +529,6 @@ export default function TeacherPermissionsModal({
                 </>
               )}
 
-              {/* ফুটার */}
               <div style={styles.footer}>
                 {step === 1 && (
                   <>
@@ -618,133 +575,77 @@ export default function TeacherPermissionsModal({
 }
 
 // ============================================
-// স্টাইল
+// স্টাইল — আগের মতোই অপরিবর্তিত
 // ============================================
 const styles = {
   overlay: {
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    background: 'rgba(0,0,0,0.6)',
-    backdropFilter: 'blur(4px)',
-    zIndex: 9999,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: '16px',
+    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+    background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)',
+    zIndex: 9999, display: 'flex', alignItems: 'center',
+    justifyContent: 'center', padding: '16px',
   },
   modal: {
-    background: 'white',
-    borderRadius: '20px',
-    maxWidth: '600px',
-    width: '100%',
-    maxHeight: '92vh',
-    display: 'flex',
-    flexDirection: 'column',
-    boxShadow: '0 25px 50px -12px rgba(0,0,0,0.3)',
+    background: 'white', borderRadius: '20px', maxWidth: '600px',
+    width: '100%', maxHeight: '92vh', display: 'flex',
+    flexDirection: 'column', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.3)',
   },
   header: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: '18px 22px',
+    display: 'flex', justifyContent: 'space-between',
+    alignItems: 'center', padding: '18px 22px',
     borderBottom: '1px solid #e2e8f0',
   },
-  title: {
-    fontSize: '17px',
-    fontWeight: '700',
-    color: '#0f172a',
-    margin: 0,
-  },
+  title: { fontSize: '17px', fontWeight: '700', color: '#0f172a', margin: 0 },
   closeBtn: {
-    background: 'none',
-    border: 'none',
-    fontSize: '20px',
-    color: '#94a3b8',
-    cursor: 'pointer',
-    padding: '4px 10px',
-    borderRadius: '6px',
+    background: 'none', border: 'none', fontSize: '20px',
+    color: '#94a3b8', cursor: 'pointer', padding: '4px 10px', borderRadius: '6px',
   },
   subHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: '10px 22px',
-    background: '#f8fafc',
-    borderBottom: '1px solid #e2e8f0',
-    flexWrap: 'wrap',
-    gap: '8px',
+    display: 'flex', justifyContent: 'space-between',
+    alignItems: 'center', padding: '10px 22px',
+    background: '#f8fafc', borderBottom: '1px solid #e2e8f0',
+    flexWrap: 'wrap', gap: '8px',
   },
   email: { fontSize: '12px', color: '#64748b', fontWeight: '500' },
   roleBadge: {
-    fontSize: '11px',
-    fontWeight: '600',
-    padding: '3px 12px',
-    borderRadius: '20px',
+    fontSize: '11px', fontWeight: '600',
+    padding: '3px 12px', borderRadius: '20px',
   },
   stepIndicator: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: '0',
-    padding: '14px 22px 4px 22px',
+    display: 'flex', alignItems: 'center',
+    justifyContent: 'center', gap: '0', padding: '14px 22px 4px 22px',
   },
   stepDot: {
-    width: '28px',
-    height: '28px',
-    borderRadius: '50%',
-    background: '#e2e8f0',
-    color: 'white',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontSize: '13px',
-    fontWeight: '700',
-    transition: 'all 0.3s ease',
+    width: '28px', height: '28px', borderRadius: '50%',
+    background: '#e2e8f0', color: 'white',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    fontSize: '13px', fontWeight: '700', transition: 'all 0.3s ease',
   },
   stepLine: {
-    width: '80px',
-    height: '3px',
-    background: '#e2e8f0',
-    transition: 'all 0.3s ease',
+    width: '80px', height: '3px',
+    background: '#e2e8f0', transition: 'all 0.3s ease',
   },
   errorBox: {
-    margin: '10px 22px 0 22px',
-    background: '#fee2e2',
-    color: '#991b1b',
-    padding: '10px 14px',
-    borderRadius: '10px',
-    fontSize: '13px',
-    borderLeft: '4px solid #dc2626',
+    margin: '10px 22px 0 22px', background: '#fee2e2',
+    color: '#991b1b', padding: '10px 14px', borderRadius: '10px',
+    fontSize: '13px', borderLeft: '4px solid #dc2626',
   },
   loading: {
-    textAlign: 'center',
-    padding: '40px 0',
-    color: '#94a3b8',
-    fontSize: '15px',
+    textAlign: 'center', padding: '40px 0',
+    color: '#94a3b8', fontSize: '15px',
   },
   step1Container: { padding: '16px 22px', overflowY: 'auto' },
   step1Hint: { fontSize: '13px', color: '#64748b', margin: '0 0 14px 0' },
   noRolesBox: {
-    background: '#fef3c7',
-    color: '#92400e',
-    padding: '14px 16px',
-    borderRadius: '10px',
-    fontSize: '13px',
-    textAlign: 'center',
+    background: '#fef3c7', color: '#92400e',
+    padding: '14px 16px', borderRadius: '10px',
+    fontSize: '13px', textAlign: 'center',
   },
   roleList: { display: 'flex', flexDirection: 'column', gap: '10px' },
   roleCard: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: '14px 16px',
-    border: '2px solid #e2e8f0',
-    borderRadius: '12px',
-    cursor: 'pointer',
-    transition: 'all 0.2s ease',
+    display: 'flex', justifyContent: 'space-between',
+    alignItems: 'center', padding: '14px 16px',
+    border: '2px solid #e2e8f0', borderRadius: '12px',
+    cursor: 'pointer', transition: 'all 0.2s ease',
   },
   roleCardActive: { borderColor: '#16a34a', background: '#f0fdf4' },
   roleCardLeft: { display: 'flex', alignItems: 'center', gap: '14px' },
@@ -753,146 +654,88 @@ const styles = {
   roleDesc: { fontSize: '12px', color: '#94a3b8', marginTop: '2px' },
   roleCheck: { fontSize: '18px' },
   infoNote: {
-    marginTop: '16px',
-    padding: '10px 14px',
-    background: '#eff6ff',
-    borderRadius: '10px',
-    fontSize: '12px',
-    color: '#1e40af',
-    borderLeft: '4px solid #3b82f6',
-    lineHeight: '1.6',
+    marginTop: '16px', padding: '10px 14px',
+    background: '#eff6ff', borderRadius: '10px',
+    fontSize: '12px', color: '#1e40af',
+    borderLeft: '4px solid #3b82f6', lineHeight: '1.6',
   },
   permissionsContainer: {
-    padding: '14px 22px',
-    overflowY: 'auto',
-    flex: 1,
+    padding: '14px 22px', overflowY: 'auto', flex: 1,
   },
   permissionInfoBox: {
-    background: '#f0f9ff',
-    color: '#075985',
-    padding: '10px 14px',
-    borderRadius: '10px',
-    fontSize: '12px',
-    marginBottom: '14px',
+    background: '#f0f9ff', color: '#075985',
+    padding: '10px 14px', borderRadius: '10px',
+    fontSize: '12px', marginBottom: '14px',
     borderLeft: '4px solid #0ea5e9',
   },
   permissionsList: { display: 'flex', flexDirection: 'column', gap: '14px' },
   categoryGroup: { paddingBottom: '10px', borderBottom: '1px solid #f1f5f9' },
   categoryHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: '6px',
+    display: 'flex', justifyContent: 'space-between',
+    alignItems: 'center', marginBottom: '6px',
   },
   categoryTitle: {
-    fontSize: '12px',
-    fontWeight: '700',
-    color: '#64748b',
-    textTransform: 'uppercase',
-    letterSpacing: '0.5px',
-    margin: 0,
+    fontSize: '12px', fontWeight: '700', color: '#64748b',
+    textTransform: 'uppercase', letterSpacing: '0.5px', margin: 0,
   },
   toggleAllLabel: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '4px',
-    cursor: 'pointer',
-    fontSize: '11px',
-    fontWeight: '600',
-    color: '#16a34a',
+    display: 'flex', alignItems: 'center', gap: '4px',
+    cursor: 'pointer', fontSize: '11px',
+    fontWeight: '600', color: '#16a34a',
   },
   toggleAllCheckbox: {
-    width: '14px',
-    height: '14px',
-    cursor: 'pointer',
-    accentColor: '#16a34a',
+    width: '14px', height: '14px',
+    cursor: 'pointer', accentColor: '#16a34a',
   },
   toggleAllText: { fontSize: '11px' },
   permissionItem: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '12px',
-    padding: '7px 8px',
-    borderRadius: '6px',
+    display: 'flex', alignItems: 'center', gap: '12px',
+    padding: '7px 8px', borderRadius: '6px',
   },
   checkbox: {
-    width: '18px',
-    height: '18px',
-    cursor: 'pointer',
-    accentColor: '#16a34a',
-    flexShrink: 0,
+    width: '18px', height: '18px', cursor: 'pointer',
+    accentColor: '#16a34a', flexShrink: 0,
   },
   permissionLabel: { fontSize: '13px', color: '#0f172a', fontWeight: '500' },
   lockedIcon: { fontSize: '14px', color: '#94a3b8', marginLeft: 'auto' },
   footer: {
-    display: 'flex',
-    justifyContent: 'flex-end',
-    gap: '10px',
-    padding: '14px 22px',
-    borderTop: '1px solid #e2e8f0',
+    display: 'flex', justifyContent: 'flex-end', gap: '10px',
+    padding: '14px 22px', borderTop: '1px solid #e2e8f0',
   },
   cancelBtn: {
-    background: '#f1f5f9',
-    color: '#64748b',
-    border: 'none',
-    padding: '10px 18px',
-    borderRadius: '10px',
-    fontSize: '13px',
-    fontWeight: '600',
-    cursor: 'pointer',
+    background: '#f1f5f9', color: '#64748b', border: 'none',
+    padding: '10px 18px', borderRadius: '10px',
+    fontSize: '13px', fontWeight: '600', cursor: 'pointer',
   },
   nextBtn: {
     background: 'linear-gradient(135deg, #16a34a, #15803d)',
-    color: 'white',
-    border: 'none',
-    padding: '10px 22px',
-    borderRadius: '10px',
-    fontSize: '13px',
-    fontWeight: '600',
-    cursor: 'pointer',
-    boxShadow: '0 4px 12px rgba(22,163,74,0.3)',
+    color: 'white', border: 'none', padding: '10px 22px',
+    borderRadius: '10px', fontSize: '13px', fontWeight: '600',
+    cursor: 'pointer', boxShadow: '0 4px 12px rgba(22,163,74,0.3)',
   },
   backBtn: {
-    background: '#f1f5f9',
-    color: '#64748b',
-    border: 'none',
-    padding: '10px 18px',
-    borderRadius: '10px',
-    fontSize: '13px',
-    fontWeight: '600',
-    cursor: 'pointer',
+    background: '#f1f5f9', color: '#64748b', border: 'none',
+    padding: '10px 18px', borderRadius: '10px',
+    fontSize: '13px', fontWeight: '600', cursor: 'pointer',
   },
   saveBtn: {
     background: 'linear-gradient(135deg, #16a34a, #15803d)',
-    color: 'white',
-    border: 'none',
-    padding: '10px 22px',
-    borderRadius: '10px',
-    fontSize: '13px',
-    fontWeight: '600',
-    cursor: 'pointer',
-    boxShadow: '0 4px 12px rgba(22,163,74,0.3)',
+    color: 'white', border: 'none', padding: '10px 22px',
+    borderRadius: '10px', fontSize: '13px', fontWeight: '600',
+    cursor: 'pointer', boxShadow: '0 4px 12px rgba(22,163,74,0.3)',
   },
   successContainer: { textAlign: 'center', padding: '30px 20px' },
   successIcon: { fontSize: '56px', marginBottom: '12px' },
   successTitle: {
-    fontSize: '20px',
-    fontWeight: '700',
-    color: '#0f172a',
-    margin: '0 0 16px 0',
+    fontSize: '20px', fontWeight: '700',
+    color: '#0f172a', margin: '0 0 16px 0',
   },
   successText: {
-    fontSize: '14px',
-    color: '#475569',
-    textAlign: 'left',
-    background: '#f0fdf4',
-    padding: '14px 16px',
-    borderRadius: '12px',
-    border: '1px solid #bbf7d0',
-    lineHeight: '1.8',
-    fontFamily: 'inherit',
-    whiteSpace: 'pre-wrap',
-    margin: '0 0 16px 0',
+    fontSize: '14px', color: '#475569', textAlign: 'left',
+    background: '#f0fdf4', padding: '14px 16px',
+    borderRadius: '12px', border: '1px solid #bbf7d0',
+    lineHeight: '1.8', fontFamily: 'inherit',
+    whiteSpace: 'pre-wrap', margin: '0 0 16px 0',
   },
   successFooter: { fontSize: '12px', color: '#94a3b8', margin: 0 },
 };
