@@ -54,9 +54,19 @@ export default function TeachersManager() {
         }, () => fetchAllData())
         .subscribe();
 
+      const adminChannel = supabase
+        .channel('admin-users-realtime')
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'admin_users',
+        }, () => fetchAllRoles())
+        .subscribe();
+
       return () => {
         supabase.removeChannel(teacherChannel);
         supabase.removeChannel(requestChannel);
+        supabase.removeChannel(adminChannel);
       };
     }
   }, [canManageTeachers]);
@@ -86,15 +96,33 @@ export default function TeachersManager() {
     setLoading(false);
   };
 
+  // ============================================
+  // ✅ fetchAllRoles — সব রোল লোড (case-insensitive)
+  // সবচেয়ে সাম্প্রতিক রেকর্ড রাখা হবে
+  // ============================================
   const fetchAllRoles = async () => {
     try {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('admin_users')
-        .select('email, role');
+        .select('email, role, updated_at')
+        .order('updated_at', { ascending: false });
+
+      if (error) {
+        console.error('❌ Fetch roles error:', error);
+        return;
+      }
 
       if (data) {
         const roleMap = {};
-        data.forEach(item => { roleMap[item.email] = item.role; });
+        data.forEach((item) => {
+          const key = (item.email || '').toLowerCase().trim();
+          if (key && !roleMap[key]) {
+            // প্রথমটাই সবচেয়ে সাম্প্রতিক (কারণ order desc)
+            roleMap[key] = item.role;
+          }
+        });
+
+        console.log('📊 Teacher roles loaded:', roleMap);
         setTeacherRoles(roleMap);
       }
     } catch (error) {
@@ -155,9 +183,9 @@ export default function TeachersManager() {
     setActionLoading(false);
   };
 
-  // =============================================
-  // ✅ Approve (সহজ ও নির্ভরযোগ্য)
-  // =============================================
+  // ============================================
+  // Approve
+  // ============================================
   const handleApprove = async (request) => {
     if (!confirm(`"${request.student_name}"-কে অনুমোদন দিতে চান?`)) return;
 
@@ -168,8 +196,6 @@ export default function TeachersManager() {
     try {
       const normalizedEmail = request.email.toLowerCase().trim();
 
-      // ✅ registration_requests আপডেট
-      // (Trigger স্বয়ংক্রিয়ভাবে teachers.is_approved = true করবে)
       const { error: reqError } = await supabase
         .from('registration_requests')
         .update({
@@ -181,7 +207,6 @@ export default function TeachersManager() {
 
       if (reqError) throw reqError;
 
-      // ✅ অতিরিক্ত safety — সরাসরি teachers টেবিল আপডেট
       const { data: existingTeacher } = await supabase
         .from('teachers')
         .select('id')
@@ -206,7 +231,6 @@ export default function TeachersManager() {
         await supabase.from('teachers').insert([teacherData]);
       }
 
-      // ✅ রিফ্রেশ ও approved ট্যাবে চলে যান
       await fetchAllData();
       setActiveTab('approved');
 
@@ -251,15 +275,42 @@ export default function TeachersManager() {
     setShowPermissionsModal(true);
   };
 
+  // ============================================
+  // ✅ getRoleBadge — case-insensitive lookup
+  // ============================================
   const getRoleBadge = (email) => {
-    const role = teacherRoles[email];
+    const normalizedEmail = (email || '').toLowerCase().trim();
+    const role = teacherRoles[normalizedEmail];
+
     if (!role) return null;
+
     const badges = {
-      super_admin: { label: '⭐ সুপার অ্যাডমিন', bg: '#dcfce7', color: '#16a34a', border: '2px solid #16a34a' },
-      admin: { label: '🔹 সাব অ্যাডমিন', bg: '#dbeafe', color: '#2563eb', border: '2px solid #2563eb' },
-      teacher: { label: '👨‍🏫 শিক্ষক', bg: '#fef3c7', color: '#f59e0b', border: '2px solid #f59e0b' },
-      viewer: { label: '👁️ দর্শক', bg: '#f1f5f9', color: '#64748b', border: '2px solid #64748b' },
+      super_admin: {
+        label: '⭐ সুপার অ্যাডমিন',
+        bg: '#dcfce7',
+        color: '#16a34a',
+        border: '2px solid #16a34a',
+      },
+      admin: {
+        label: '🔹 অ্যাডমিন',
+        bg: '#dbeafe',
+        color: '#2563eb',
+        border: '2px solid #2563eb',
+      },
+      sub_admin: {
+        label: '🔷 সাব-অ্যাডমিন',
+        bg: '#e0e7ff',
+        color: '#4338ca',
+        border: '2px solid #4338ca',
+      },
+      teacher: {
+        label: '👨‍🏫 শিক্ষক',
+        bg: '#fef3c7',
+        color: '#f59e0b',
+        border: '2px solid #f59e0b',
+      },
     };
+
     return badges[role] || null;
   };
 
