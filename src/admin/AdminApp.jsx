@@ -31,9 +31,6 @@ import AttendanceManager from './pages/AttendanceManager';
 import AchievementManager from './pages/AchievementManager';
 import { useDarkMode } from '../hooks/useDarkMode';
 
-// =============================================
-// ✅ প্রোটেক্টেড রাউট
-// =============================================
 function ProtectedRoute({ children, requiredRole }) {
   const { isAuthenticated, loading, adminUser } = useAdmin();
 
@@ -72,112 +69,66 @@ export default function AdminApp() {
 
   return (
     <AdminProvider>
-      {/* ✅ গ্লোবাল ডার্ক মোড CSS — সব inline style force override */}
+      {/* ============================================
+          🌙 ডার্ক মোড CSS — সঠিক ও প্রফেশনাল
+          ============================================ */}
       <style>{`
-        /* ============================================
-           🌙 অ্যাডমিন প্যানেল ডার্ক মোড (অটো Force Override)
-           ============================================ */
         @media (prefers-color-scheme: dark) {
           
-          /* ===== Base ===== */
+          /* ===== Base background ===== */
           html, body {
-            background-color: #0f172a !important;
-            color: #f1f5f9 !important;
+            background-color: #0f172a;
+            color: #f1f5f9;
           }
           
           #root {
-            background-color: #0f172a !important;
-            min-height: 100vh;
+            background-color: #0f172a;
           }
           
-          /* ===== সব heading ===== */
+          /* ===== সব সাধারণ টেক্সট ===== */
           h1, h2, h3, h4, h5, h6 {
-            color: #f1f5f9 !important;
+            color: #f1f5f9;
           }
           
-          /* ===== সব টেক্সট ===== */
-          p, span, small, label, strong, b, i {
-            color: #cbd5e1;
+          /* ============================================
+             ⭐ সব চিহ্নিত কার্ড ও বক্স — ডার্ক শেড
+             এখানে !important দিয়ে inline style override
+             ============================================ */
+          .card,
+          .card * {
+            background-color: transparent;
           }
           
-          /* ===== White background force override ===== */
-          [style*="background-color: rgb(255, 255, 255)"],
-          [style*="background-color: white"],
-          [style*="background-color: #ffffff"],
-          [style*="background-color: #fff"],
-          [style*="backgroundColor: white"],
-          [style*="backgroundColor: #ffffff"],
-          [style*="background: white"],
-          [style*="background: #ffffff"],
-          [style*="background-color: #FFFFFF"] {
+          .card {
             background-color: #1e293b !important;
-            color: #f1f5f9 !important;
+            border-color: #334155 !important;
+            color: #e2e8f0;
           }
           
-          /* ===== হালকা ধূসর background (card, box) ===== */
-          [style*="background-color: rgb(248, 250, 252)"],
-          [style*="background-color: #f8fafc"] {
+          /* ============================================
+             ⭐ যেসব div-এ inline style="background-color: white" আছে
+             সেগুলো ধূসর-নেভি হবে
+             ============================================ */
+          div[style*="background-color: rgb(255, 255, 255)"],
+          div[style*="background-color: white"],
+          div[style*="background-color: #ffffff"],
+          section[style*="background-color: rgb(255, 255, 255)"],
+          main[style*="background-color: rgb(255, 255, 255)"] {
+            background-color: #1e293b !important;
+          }
+          
+          /* ============================================
+             ⭐ যেসব div-এ style="background-color: #f8fafc" বা হালকা ধূসর
+             সেগুলো মাঝারি ধূসর হবে
+             ============================================ */
+          div[style*="background-color: rgb(248, 250, 252)"],
+          div[style*="background-color: #f8fafc"],
+          div[style*="background-color: rgb(241, 245, 249)"],
+          div[style*="background-color: #f1f5f9"] {
             background-color: #0f172a !important;
           }
           
-          [style*="background-color: rgb(241, 245, 249)"],
-          [style*="background-color: #f1f5f9"] {
-            background-color: #0f172a !important;
-          }
-          
-          [style*="background-color: rgb(226, 232, 240)"],
-          [style*="background-color: #e2e8f0"] {
-            background-color: #334155 !important;
-          }
-          
-          /* ===== Linear gradient force override ===== */
-          [style*="linear-gradient(135deg, #dcfce7"],
-          [style*="linear-gradient(135deg, #bbf7d0"] {
-            background: linear-gradient(135deg, #064e3b, #14532d) !important;
-          }
-          
-          [style*="linear-gradient(135deg, #eff6ff"],
-          [style*="linear-gradient(135deg, #dbeafe"] {
-            background: linear-gradient(135deg, #1e3a8a, #1e40af) !important;
-          }
-          
-          [style*="linear-gradient(135deg, #fef3c7"],
-          [style*="linear-gradient(135deg, #fde68a"] {
-            background: linear-gradient(135deg, #78350f, #92400e) !important;
-          }
-          
-          [style*="linear-gradient(135deg, #fce7f3"],
-          [style*="linear-gradient(135deg, #fbcfe8"] {
-            background: linear-gradient(135deg, #831843, #9d174d) !important;
-          }
-          
-          /* ===== কালো টেক্সট force override ===== */
-          [style*="color: rgb(15, 23, 42)"],
-          [style*="color: #0f172a"] {
-            color: #f1f5f9 !important;
-          }
-          
-          [style*="color: rgb(51, 65, 85)"],
-          [style*="color: #334155"] {
-            color: #cbd5e1 !important;
-          }
-          
-          [style*="color: rgb(30, 41, 59)"],
-          [style*="color: #1e293b"] {
-            color: #e2e8f0 !important;
-          }
-          
-          [style*="color: rgb(100, 116, 139)"],
-          [style*="color: #64748b"] {
-            color: #94a3b8 !important;
-          }
-          
-          [style*="color: rgb(71, 85, 105)"],
-          [style*="color: #475569"] {
-            color: #cbd5e1 !important;
-          }
-          
-          /* ===== Input, Select, Textarea ===== */
+          /* ===== Input/Select/Textarea ===== */
           input, select, textarea {
             background-color: #1e293b !important;
             color: #f1f5f9 !important;
@@ -185,15 +136,12 @@ export default function AdminApp() {
           }
           
           input::placeholder, textarea::placeholder {
-            color: #64748b !important;
+            color: #94a3b8 !important;
           }
           
-          /* ===== Table ===== */
+          /* ===== Tables ===== */
           table {
             background-color: #1e293b !important;
-          }
-          thead, tbody, tr {
-            background-color: transparent !important;
           }
           th {
             background-color: #0f172a !important;
@@ -206,63 +154,7 @@ export default function AdminApp() {
             border-color: #334155 !important;
           }
           
-          /* ===== Border force override ===== */
-          [style*="border: 1px solid rgb(226, 232, 240)"],
-          [style*="border: 1.5px solid rgb(226, 232, 240)"],
-          [style*="border: 2px solid rgb(226, 232, 240)"],
-          [style*="border: 1px solid #e2e8f0"],
-          [style*="border: 1.5px solid #e2e8f0"],
-          [style*="border: 2px solid #e2e8f0"],
-          [style*="border-color: #e2e8f0"],
-          [style*="borderBottom: 2px solid #f1f5f9"],
-          [style*="border-bottom: 2px solid #f1f5f9"] {
-            border-color: #334155 !important;
-          }
-          
-          [style*="border: 1px solid #f1f5f9"],
-          [style*="border-bottom: 1px solid #f1f5f9"],
-          [style*="border-top: 1px solid #f1f5f9"] {
-            border-color: #1e293b !important;
-          }
-          
-          /* ===== Card class ===== */
-          .card {
-            background-color: #1e293b !important;
-            border-color: #334155 !important;
-            color: #f1f5f9 !important;
-          }
-          
-          /* ===== Sidebar dark (already dark) ===== */
-          aside, nav {
-            /* সাইডবার আগেই ডার্ক, কিছু করার নেই */
-          }
-          
-          /* ===== Modal/Overlay ===== */
-          [style*="background: rgba(0,0,0,0.6)"],
-          [style*="background: rgba(0, 0, 0, 0.6)"] {
-            background: rgba(0, 0, 0, 0.8) !important;
-          }
-          
-          /* ===== Success/Error boxes ===== */
-          [style*="background-color: rgb(220, 252, 231)"],
-          [style*="background: #dcfce7"] {
-            background: #064e3b !important;
-            color: #6ee7b7 !important;
-          }
-          
-          [style*="background-color: rgb(254, 226, 226)"],
-          [style*="background: #fee2e2"] {
-            background: #7f1d1d !important;
-            color: #fca5a5 !important;
-          }
-          
-          [style*="background-color: rgb(254, 243, 199)"],
-          [style*="background: #fef3c7"] {
-            background: #78350f !important;
-            color: #fcd34d !important;
-          }
-          
-          /* ===== Scrollbar dark ===== */
+          /* ===== Scrollbar ===== */
           ::-webkit-scrollbar {
             width: 8px;
             height: 8px;
@@ -273,9 +165,6 @@ export default function AdminApp() {
           ::-webkit-scrollbar-thumb {
             background: #334155;
             border-radius: 4px;
-          }
-          ::-webkit-scrollbar-thumb:hover {
-            background: #475569;
           }
         }
       `}</style>
