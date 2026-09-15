@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AdminProvider, useAdmin } from '../context/AdminContext';
 import Login from './pages/Login';
@@ -28,11 +28,11 @@ import ResultManager from './pages/ResultManager';
 import RoutineManager from './pages/RoutineManager';
 import AssignmentManager from './pages/AssignmentManager';
 import AttendanceManager from './pages/AttendanceManager';
-// ✅ নতুন ইমপোর্ট - অর্জন ম্যানেজার
 import AchievementManager from './pages/AchievementManager';
+import { useDarkMode } from '../hooks/useDarkMode';
 
 // =============================================
-// ✅ প্রোটেক্টেড রাউট (রোল অনুযায়ী চেক)
+// ✅ প্রোটেক্টেড রাউট
 // =============================================
 function ProtectedRoute({ children, requiredRole }) {
   const { isAuthenticated, loading, adminUser } = useAdmin();
@@ -55,7 +55,10 @@ function ProtectedRoute({ children, requiredRole }) {
     if (requiredRole === 'super_admin' && userRole !== 'super_admin') {
       return <Navigate to="/" replace />;
     }
-    if (requiredRole === 'admin' && !['super_admin', 'admin'].includes(userRole)) {
+    if (
+      requiredRole === 'admin' &&
+      !['super_admin', 'admin'].includes(userRole)
+    ) {
       return <Navigate to="/" replace />;
     }
   }
@@ -64,12 +67,79 @@ function ProtectedRoute({ children, requiredRole }) {
 }
 
 export default function AdminApp() {
+  // ✅ ডার্ক মোড অটো-ডিটেকশন
+  useDarkMode();
+
   return (
     <AdminProvider>
       <BrowserRouter>
+        {/* ✅ গ্লোবাল ডার্ক মোড CSS */}
+        <style>{`
+          /* ============================================
+             🌙 অ্যাডমিন প্যানেল ডার্ক মোড (অটো)
+             ============================================ */
+          @media (prefers-color-scheme: dark) {
+            body {
+              background-color: #0f172a !important;
+              color: #f1f5f9 !important;
+            }
+            .admin-content-bg {
+              background-color: #0f172a !important;
+            }
+            /* Dashboard কার্ড */
+            [class*="card"],
+            .card {
+              background-color: #1e293b !important;
+              border-color: #334155 !important;
+            }
+            /* ইনপুট ফিল্ড */
+            input,
+            select,
+            textarea {
+              background-color: #1e293b !important;
+              color: #f1f5f9 !important;
+              border-color: #334155 !important;
+            }
+            input::placeholder,
+            textarea::placeholder {
+              color: #64748b !important;
+            }
+            /* টেবিল */
+            table {
+              background-color: #1e293b !important;
+            }
+            th {
+              background-color: #0f172a !important;
+              color: #cbd5e1 !important;
+            }
+            td {
+              border-color: #334155 !important;
+              color: #e2e8f0 !important;
+            }
+            /* হেডিং */
+            h1, h2, h3, h4, h5, h6 {
+              color: #f1f5f9 !important;
+            }
+            /* প্যারাগ্রাফ */
+            p, span, label, div {
+              color: inherit;
+            }
+            /* ফর্ম লেবেল */
+            label {
+              color: #cbd5e1 !important;
+            }
+            /* পপআপ background */
+            [style*="background-color: rgb(255, 255, 255)"],
+            [style*="backgroundColor: white"],
+            [style*="background: white"] {
+              /* এই সিলেক্টর কাজ করবে না, তাই আলাদা ভাবে করতে হবে */
+            }
+          }
+        `}</style>
+
         <Routes>
           <Route path="/login" element={<Login />} />
-          
+
           <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
           <Route path="/homepage" element={<ProtectedRoute><HomepageEditor /></ProtectedRoute>} />
           <Route path="/admissions" element={<ProtectedRoute><AdmissionDashboard /></ProtectedRoute>} />
@@ -84,43 +154,15 @@ export default function AdminApp() {
           <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
           <Route path="/seo" element={<ProtectedRoute><SEO /></ProtectedRoute>} />
           <Route path="/media" element={<ProtectedRoute><MediaLibrary /></ProtectedRoute>} />
-          
-          <Route 
-            path="/registration-codes" 
-            element={<ProtectedRoute><RegistrationCodes /></ProtectedRoute>} 
-          />
-          
-          <Route 
-            path="/registration-requests" 
-            element={<ProtectedRoute><RegistrationRequests /></ProtectedRoute>} 
-          />
-          
-          <Route 
-            path="/results" 
-            element={<ProtectedRoute><ResultManager /></ProtectedRoute>} 
-          />
 
-          <Route 
-            path="/routines" 
-            element={<ProtectedRoute><RoutineManager /></ProtectedRoute>} 
-          />
+          <Route path="/registration-codes" element={<ProtectedRoute><RegistrationCodes /></ProtectedRoute>} />
+          <Route path="/registration-requests" element={<ProtectedRoute><RegistrationRequests /></ProtectedRoute>} />
+          <Route path="/results" element={<ProtectedRoute><ResultManager /></ProtectedRoute>} />
+          <Route path="/routines" element={<ProtectedRoute><RoutineManager /></ProtectedRoute>} />
+          <Route path="/assignments" element={<ProtectedRoute><AssignmentManager /></ProtectedRoute>} />
+          <Route path="/attendance" element={<ProtectedRoute><AttendanceManager /></ProtectedRoute>} />
+          <Route path="/achievements" element={<ProtectedRoute><AchievementManager /></ProtectedRoute>} />
 
-          <Route 
-            path="/assignments" 
-            element={<ProtectedRoute><AssignmentManager /></ProtectedRoute>} 
-          />
-
-          <Route 
-            path="/attendance" 
-            element={<ProtectedRoute><AttendanceManager /></ProtectedRoute>} 
-          />
-
-          {/* ✅ নতুন রাউট: অর্জন ম্যানেজার */}
-          <Route 
-            path="/achievements" 
-            element={<ProtectedRoute><AchievementManager /></ProtectedRoute>} 
-          />
-          
           <Route path="/users" element={<ProtectedRoute requiredRole="super_admin"><Users /></ProtectedRoute>} />
           <Route path="/permissions" element={<ProtectedRoute requiredRole="super_admin"><Permissions /></ProtectedRoute>} />
           <Route path="/backup" element={<ProtectedRoute requiredRole="super_admin"><Backup /></ProtectedRoute>} />
