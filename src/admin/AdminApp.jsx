@@ -64,97 +64,214 @@ function ProtectedRoute({ children, requiredRole }) {
 }
 
 export default function AdminApp() {
-  // ✅ ডার্ক মোড অটো-ডিটেকশন
   useDarkMode();
 
   return (
     <AdminProvider>
-      {/* ============================================
-          🌙 ডার্ক মোড CSS — সঠিক ও প্রফেশনাল
-          ============================================ */}
       <style>{`
+        /* ============================================
+           🌙 অ্যাডমিন প্যানেল — ডার্ক মোড (অটো)
+           মেইন ওয়েবসাইটের মতো একই পদ্ধতি
+           ============================================ */
         @media (prefers-color-scheme: dark) {
-          
-          /* ===== Base background ===== */
-          html, body {
-            background-color: #0f172a;
-            color: #f1f5f9;
+
+          /* ===== Base ===== */
+          html {
+            background-color: #0f172a !important;
           }
-          
+          body {
+            background-color: #0f172a !important;
+            color: #f1f5f9 !important;
+          }
           #root {
-            background-color: #0f172a;
+            background-color: #0f172a !important;
           }
-          
-          /* ===== সব সাধারণ টেক্সট ===== */
+
+          /* ============================================
+             🎨 White background → Dark Navy (#1e293b)
+             ============================================ */
+          [style*="background-color: rgb(255, 255, 255)"],
+          [style*="background-color: #ffffff"],
+          [style*="background-color: #fff"],
+          [style*="background-color: white"],
+          [style*="background: rgb(255, 255, 255)"],
+          [style*="background: #ffffff"],
+          [style*="background: white"] {
+            background-color: #1e293b !important;
+            color: #f1f5f9 !important;
+          }
+
+          /* ============================================
+             🎨 Light grey → Darkest (#0f172a)
+             ============================================ */
+          [style*="background-color: rgb(248, 250, 252)"],
+          [style*="background-color: #f8fafc"] {
+            background-color: #0f172a !important;
+            color: #f1f5f9 !important;
+          }
+
+          [style*="background-color: rgb(241, 245, 249)"],
+          [style*="background-color: #f1f5f9"] {
+            background-color: #0f172a !important;
+            color: #f1f5f9 !important;
+          }
+
+          [style*="background-color: rgb(226, 232, 240)"],
+          [style*="background-color: #e2e8f0"] {
+            background-color: #334155 !important;
+            color: #f1f5f9 !important;
+          }
+
+          /* ============================================
+             🎨 Pastel colors (Stat cards) → Dark variants
+             ============================================ */
+          [style*="background: rgba(59, 130, 246"],
+          [style*="background: rgba(59,130,246"] {
+            background: linear-gradient(135deg, #1e3a8a, #1e40af) !important;
+            color: #dbeafe !important;
+          }
+
+          [style*="background: rgba(22, 163, 74"],
+          [style*="background: rgba(22,163,74"] {
+            background: linear-gradient(135deg, #064e3b, #14532d) !important;
+            color: #d1fae5 !important;
+          }
+
+          [style*="background: rgba(245, 158, 11"],
+          [style*="background: rgba(245,158,11"] {
+            background: linear-gradient(135deg, #78350f, #92400e) !important;
+            color: #fef3c7 !important;
+          }
+
+          [style*="background: rgba(139, 92, 246"],
+          [style*="background: rgba(139,92,246"] {
+            background: linear-gradient(135deg, #4c1d95, #5b21b6) !important;
+            color: #ede9fe !important;
+          }
+
+          [style*="linear-gradient(135deg, #dcfce7"],
+          [style*="linear-gradient(135deg, #bbf7d0"] {
+            background: linear-gradient(135deg, #064e3b, #14532d) !important;
+            color: #d1fae5 !important;
+          }
+
+          [style*="linear-gradient(135deg, #dbeafe"],
+          [style*="linear-gradient(135deg, #93c5fd"] {
+            background: linear-gradient(135deg, #1e3a8a, #1e40af) !important;
+            color: #dbeafe !important;
+          }
+
+          [style*="linear-gradient(135deg, #fef3c7"],
+          [style*="linear-gradient(135deg, #fde68a"] {
+            background: linear-gradient(135deg, #78350f, #92400e) !important;
+            color: #fef3c7 !important;
+          }
+
+          [style*="linear-gradient(135deg, #f5f3ff"],
+          [style*="linear-gradient(135deg, #ede9fe"] {
+            background: linear-gradient(135deg, #4c1d95, #5b21b6) !important;
+            color: #ede9fe !important;
+          }
+
+          /* ============================================
+             🎨 Dark text → Light text
+             ============================================ */
+          [style*="color: rgb(15, 23, 42)"],
+          [style*="color: #0f172a"] {
+            color: #f1f5f9 !important;
+          }
+
+          [style*="color: rgb(30, 41, 59)"],
+          [style*="color: #1e293b"] {
+            color: #e2e8f0 !important;
+          }
+
+          [style*="color: rgb(51, 65, 85)"],
+          [style*="color: #334155"] {
+            color: #cbd5e1 !important;
+          }
+
+          [style*="color: rgb(71, 85, 105)"],
+          [style*="color: #475569"] {
+            color: #cbd5e1 !important;
+          }
+
+          [style*="color: rgb(100, 116, 139)"],
+          [style*="color: #64748b"] {
+            color: #94a3b8 !important;
+          }
+
+          [style*="color: rgb(148, 163, 184)"],
+          [style*="color: #94a3b8"] {
+            color: #cbd5e1 !important;
+          }
+
+          /* ============================================
+             🎨 Global text safety
+             ============================================ */
           h1, h2, h3, h4, h5, h6 {
             color: #f1f5f9;
           }
-          
+
           /* ============================================
-             ⭐ সব চিহ্নিত কার্ড ও বক্স — ডার্ক শেড
-             এখানে !important দিয়ে inline style override
+             🎨 Inputs
              ============================================ */
-          .card,
-          .card * {
-            background-color: transparent;
-          }
-          
-          .card {
-            background-color: #1e293b !important;
-            border-color: #334155 !important;
-            color: #e2e8f0;
-          }
-          
-          /* ============================================
-             ⭐ যেসব div-এ inline style="background-color: white" আছে
-             সেগুলো ধূসর-নেভি হবে
-             ============================================ */
-          div[style*="background-color: rgb(255, 255, 255)"],
-          div[style*="background-color: white"],
-          div[style*="background-color: #ffffff"],
-          section[style*="background-color: rgb(255, 255, 255)"],
-          main[style*="background-color: rgb(255, 255, 255)"] {
-            background-color: #1e293b !important;
-          }
-          
-          /* ============================================
-             ⭐ যেসব div-এ style="background-color: #f8fafc" বা হালকা ধূসর
-             সেগুলো মাঝারি ধূসর হবে
-             ============================================ */
-          div[style*="background-color: rgb(248, 250, 252)"],
-          div[style*="background-color: #f8fafc"],
-          div[style*="background-color: rgb(241, 245, 249)"],
-          div[style*="background-color: #f1f5f9"] {
-            background-color: #0f172a !important;
-          }
-          
-          /* ===== Input/Select/Textarea ===== */
           input, select, textarea {
             background-color: #1e293b !important;
             color: #f1f5f9 !important;
             border-color: #334155 !important;
           }
-          
-          input::placeholder, textarea::placeholder {
+
+          input::placeholder,
+          textarea::placeholder {
             color: #94a3b8 !important;
           }
-          
-          /* ===== Tables ===== */
+
+          /* ============================================
+             🎨 Borders
+             ============================================ */
+          [style*="border: 1px solid rgb(226, 232, 240)"],
+          [style*="border: 1.5px solid rgb(226, 232, 240)"],
+          [style*="border: 2px solid rgb(226, 232, 240)"],
+          [style*="border-color: rgb(226, 232, 240)"],
+          [style*="border: 1px solid #e2e8f0"],
+          [style*="border: 1.5px solid #e2e8f0"],
+          [style*="border: 2px solid #e2e8f0"] {
+            border-color: #334155 !important;
+          }
+
+          [style*="border-bottom: 2px solid rgb(241, 245, 249)"],
+          [style*="border-bottom: 2px solid #f1f5f9"],
+          [style*="border-bottom: 1px solid rgb(241, 245, 249)"],
+          [style*="border-bottom: 1px solid #f1f5f9"],
+          [style*="border-top: 1px solid rgb(241, 245, 249)"],
+          [style*="border-top: 1px solid #f1f5f9"] {
+            border-color: #334155 !important;
+          }
+
+          /* ============================================
+             🎨 Tables
+             ============================================ */
           table {
             background-color: #1e293b !important;
+            color: #e2e8f0 !important;
           }
+
           th {
             background-color: #0f172a !important;
             color: #cbd5e1 !important;
             border-color: #334155 !important;
           }
+
           td {
             background-color: #1e293b !important;
             color: #e2e8f0 !important;
             border-color: #334155 !important;
           }
-          
-          /* ===== Scrollbar ===== */
+
+          /* ============================================
+             🎨 Scrollbar
+             ============================================ */
           ::-webkit-scrollbar {
             width: 8px;
             height: 8px;
@@ -165,6 +282,9 @@ export default function AdminApp() {
           ::-webkit-scrollbar-thumb {
             background: #334155;
             border-radius: 4px;
+          }
+          ::-webkit-scrollbar-thumb:hover {
+            background: #475569;
           }
         }
       `}</style>
