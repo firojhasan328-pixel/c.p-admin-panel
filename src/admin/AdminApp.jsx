@@ -70,166 +70,145 @@ export default function AdminApp() {
     <AdminProvider>
       <style>{`
         /* ============================================
-           🌙 অ্যাডমিন প্যানেল — ডার্ক মোড (অটো)
-           মেইন ওয়েবসাইটের মতো একই পদ্ধতি
+           🌙 অ্যাডমিন প্যানেল — ডার্ক মোড (চূড়ান্ত)
+           শুধু "background:" শর্টহ্যান্ড দিয়েই কাজ হবে
            ============================================ */
         @media (prefers-color-scheme: dark) {
 
-          /* ===== Base ===== */
-          html {
-            background-color: #0f172a !important;
-          }
-          body {
+          /* ===== Base force ===== */
+          html, body, #root {
+            background: #0f172a !important;
             background-color: #0f172a !important;
             color: #f1f5f9 !important;
           }
-          #root {
+
+          /* ============================================
+             ⭐ মূল সমাধান — মেইন background ধরা
+             ("background:" শর্টহ্যান্ড দিয়ে)
+             ============================================ */
+
+          /* হালকা ধূসর #f1f5f9 → সবচেয়ে গাঢ় */
+          [style*="background: rgb(241, 245, 249)"],
+          [style*="background: #f1f5f9"],
+          [style*="background-color: rgb(241, 245, 249)"],
+          [style*="background-color: #f1f5f9"] {
+            background: #0f172a !important;
             background-color: #0f172a !important;
           }
 
-          /* ============================================
-             🎨 White background → Dark Navy (#1e293b)
-             ============================================ */
+          /* হালকা ধূসর #f8fafc → সবচেয়ে গাঢ় */
+          [style*="background: rgb(248, 250, 252)"],
+          [style*="background: #f8fafc"],
+          [style*="background-color: rgb(248, 250, 252)"],
+          [style*="background-color: #f8fafc"] {
+            background: #0f172a !important;
+            background-color: #0f172a !important;
+          }
+
+          /* সাদা #ffffff → কার্ড শেড (#1e293b) */
+          [style*="background: rgb(255, 255, 255)"],
+          [style*="background: #ffffff"],
+          [style*="background: #fff"],
+          [style*="background: white"],
           [style*="background-color: rgb(255, 255, 255)"],
           [style*="background-color: #ffffff"],
           [style*="background-color: #fff"],
-          [style*="background-color: white"],
-          [style*="background: rgb(255, 255, 255)"],
-          [style*="background: #ffffff"],
-          [style*="background: white"] {
+          [style*="background-color: white"] {
+            background: #1e293b !important;
             background-color: #1e293b !important;
-            color: #f1f5f9 !important;
           }
 
-          /* ============================================
-             🎨 Light grey → Darkest (#0f172a)
-             ============================================ */
-          [style*="background-color: rgb(248, 250, 252)"],
-          [style*="background-color: #f8fafc"] {
-            background-color: #0f172a !important;
-            color: #f1f5f9 !important;
-          }
-
-          [style*="background-color: rgb(241, 245, 249)"],
-          [style*="background-color: #f1f5f9"] {
-            background-color: #0f172a !important;
-            color: #f1f5f9 !important;
-          }
-
+          /* মাঝারি ধূসর #e2e8f0 → medium dark */
+          [style*="background: rgb(226, 232, 240)"],
+          [style*="background: #e2e8f0"],
           [style*="background-color: rgb(226, 232, 240)"],
           [style*="background-color: #e2e8f0"] {
+            background: #334155 !important;
             background-color: #334155 !important;
-            color: #f1f5f9 !important;
           }
 
           /* ============================================
-             🎨 Pastel colors (Stat cards) → Dark variants
+             🎨 Stat কার্ড gradient (pastel → dark)
              ============================================ */
-          [style*="background: rgba(59, 130, 246"],
-          [style*="background: rgba(59,130,246"] {
+          [style*="rgba(59, 130, 246"] {
             background: linear-gradient(135deg, #1e3a8a, #1e40af) !important;
-            color: #dbeafe !important;
           }
-
-          [style*="background: rgba(22, 163, 74"],
-          [style*="background: rgba(22,163,74"] {
+          [style*="rgba(22, 163, 74"] {
             background: linear-gradient(135deg, #064e3b, #14532d) !important;
-            color: #d1fae5 !important;
           }
-
-          [style*="background: rgba(245, 158, 11"],
-          [style*="background: rgba(245,158,11"] {
+          [style*="rgba(245, 158, 11"] {
             background: linear-gradient(135deg, #78350f, #92400e) !important;
-            color: #fef3c7 !important;
           }
-
-          [style*="background: rgba(139, 92, 246"],
-          [style*="background: rgba(139,92,246"] {
+          [style*="rgba(139, 92, 246"] {
             background: linear-gradient(135deg, #4c1d95, #5b21b6) !important;
-            color: #ede9fe !important;
           }
-
-          [style*="linear-gradient(135deg, #dcfce7"],
-          [style*="linear-gradient(135deg, #bbf7d0"] {
-            background: linear-gradient(135deg, #064e3b, #14532d) !important;
-            color: #d1fae5 !important;
-          }
-
-          [style*="linear-gradient(135deg, #dbeafe"],
-          [style*="linear-gradient(135deg, #93c5fd"] {
-            background: linear-gradient(135deg, #1e3a8a, #1e40af) !important;
-            color: #dbeafe !important;
-          }
-
-          [style*="linear-gradient(135deg, #fef3c7"],
-          [style*="linear-gradient(135deg, #fde68a"] {
-            background: linear-gradient(135deg, #78350f, #92400e) !important;
-            color: #fef3c7 !important;
-          }
-
-          [style*="linear-gradient(135deg, #f5f3ff"],
-          [style*="linear-gradient(135deg, #ede9fe"] {
-            background: linear-gradient(135deg, #4c1d95, #5b21b6) !important;
-            color: #ede9fe !important;
+          [style*="rgba(239, 68, 68"] {
+            background: linear-gradient(135deg, #7f1d1d, #991b1b) !important;
           }
 
           /* ============================================
-             🎨 Dark text → Light text
+             🎨 Text colors — dark → light
              ============================================ */
           [style*="color: rgb(15, 23, 42)"],
           [style*="color: #0f172a"] {
             color: #f1f5f9 !important;
           }
-
           [style*="color: rgb(30, 41, 59)"],
           [style*="color: #1e293b"] {
             color: #e2e8f0 !important;
           }
-
           [style*="color: rgb(51, 65, 85)"],
           [style*="color: #334155"] {
             color: #cbd5e1 !important;
           }
-
           [style*="color: rgb(71, 85, 105)"],
           [style*="color: #475569"] {
             color: #cbd5e1 !important;
           }
-
           [style*="color: rgb(100, 116, 139)"],
           [style*="color: #64748b"] {
             color: #94a3b8 !important;
           }
-
           [style*="color: rgb(148, 163, 184)"],
           [style*="color: #94a3b8"] {
             color: #cbd5e1 !important;
           }
 
-          /* ============================================
-             🎨 Global text safety
-             ============================================ */
+          /* ===== Headings ===== */
           h1, h2, h3, h4, h5, h6 {
-            color: #f1f5f9;
+            color: #f1f5f9 !important;
           }
 
-          /* ============================================
-             🎨 Inputs
-             ============================================ */
+          /* ===== Inputs ===== */
           input, select, textarea {
+            background: #1e293b !important;
             background-color: #1e293b !important;
             color: #f1f5f9 !important;
             border-color: #334155 !important;
           }
-
-          input::placeholder,
-          textarea::placeholder {
+          input::placeholder, textarea::placeholder {
             color: #94a3b8 !important;
           }
 
-          /* ============================================
-             🎨 Borders
-             ============================================ */
+          /* ===== Tables ===== */
+          table {
+            background: #1e293b !important;
+            background-color: #1e293b !important;
+          }
+          th {
+            background: #0f172a !important;
+            background-color: #0f172a !important;
+            color: #cbd5e1 !important;
+            border-color: #334155 !important;
+          }
+          td {
+            background: #1e293b !important;
+            background-color: #1e293b !important;
+            color: #e2e8f0 !important;
+            border-color: #334155 !important;
+          }
+
+          /* ===== Borders ===== */
           [style*="border: 1px solid rgb(226, 232, 240)"],
           [style*="border: 1.5px solid rgb(226, 232, 240)"],
           [style*="border: 2px solid rgb(226, 232, 240)"],
@@ -240,38 +219,7 @@ export default function AdminApp() {
             border-color: #334155 !important;
           }
 
-          [style*="border-bottom: 2px solid rgb(241, 245, 249)"],
-          [style*="border-bottom: 2px solid #f1f5f9"],
-          [style*="border-bottom: 1px solid rgb(241, 245, 249)"],
-          [style*="border-bottom: 1px solid #f1f5f9"],
-          [style*="border-top: 1px solid rgb(241, 245, 249)"],
-          [style*="border-top: 1px solid #f1f5f9"] {
-            border-color: #334155 !important;
-          }
-
-          /* ============================================
-             🎨 Tables
-             ============================================ */
-          table {
-            background-color: #1e293b !important;
-            color: #e2e8f0 !important;
-          }
-
-          th {
-            background-color: #0f172a !important;
-            color: #cbd5e1 !important;
-            border-color: #334155 !important;
-          }
-
-          td {
-            background-color: #1e293b !important;
-            color: #e2e8f0 !important;
-            border-color: #334155 !important;
-          }
-
-          /* ============================================
-             🎨 Scrollbar
-             ============================================ */
+          /* ===== Scrollbar ===== */
           ::-webkit-scrollbar {
             width: 8px;
             height: 8px;
