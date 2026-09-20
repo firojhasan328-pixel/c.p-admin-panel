@@ -29,8 +29,13 @@ import RoutineManager from './pages/RoutineManager';
 import AssignmentManager from './pages/AssignmentManager';
 import AttendanceManager from './pages/AttendanceManager';
 import AchievementManager from './pages/AchievementManager';
+import AIChatManager from './pages/AIChatManager';
+import AIChatLogs from './pages/AIChatLogs';
 import { useDarkMode } from '../hooks/useDarkMode';
 
+// =============================================
+// প্রোটেক্টেড রাউট
+// =============================================
 function ProtectedRoute({ children, requiredRole }) {
   const { isAuthenticated, loading, adminUser } = useAdmin();
 
@@ -64,72 +69,52 @@ function ProtectedRoute({ children, requiredRole }) {
 }
 
 export default function AdminApp() {
+  // ✅ ডার্ক মোড
   useDarkMode();
 
   return (
     <AdminProvider>
+      {/* ============================================
+          🌙 অ্যাডমিন প্যানেল ডার্ক মোড CSS
+          ============================================ */}
       <style>{`
-        /* ============================================
-           🌙 অ্যাডমিন প্যানেল — ডার্ক মোড (চূড়ান্ত)
-           শুধু "background:" শর্টহ্যান্ড দিয়েই কাজ হবে
-           ============================================ */
         @media (prefers-color-scheme: dark) {
+          html, body {
+            background-color: #0f172a !important;
+            color: #f1f5f9 !important;
+          }
+          #root { background-color: #0f172a !important; }
 
-          /* ===== Base force ===== */
-          html, body, #root {
-            background: #0f172a !important;
+          [style*="background-color: rgb(255, 255, 255)"],
+          [style*="background-color: #ffffff"],
+          [style*="background-color: #fff"],
+          [style*="background-color: white"],
+          [style*="background: rgb(255, 255, 255)"],
+          [style*="background: #ffffff"],
+          [style*="background: white"] {
+            background-color: #1e293b !important;
+            color: #f1f5f9 !important;
+          }
+
+          [style*="background-color: rgb(248, 250, 252)"],
+          [style*="background-color: #f8fafc"],
+          [style*="background: rgb(248, 250, 252)"],
+          [style*="background: #f8fafc"],
+          [style*="background-color: rgb(241, 245, 249)"],
+          [style*="background-color: #f1f5f9"],
+          [style*="background: rgb(241, 245, 249)"],
+          [style*="background: #f1f5f9"] {
             background-color: #0f172a !important;
             color: #f1f5f9 !important;
           }
 
-          /* ============================================
-             ⭐ মূল সমাধান — মেইন background ধরা
-             ("background:" শর্টহ্যান্ড দিয়ে)
-             ============================================ */
-
-          /* হালকা ধূসর #f1f5f9 → সবচেয়ে গাঢ় */
-          [style*="background: rgb(241, 245, 249)"],
-          [style*="background: #f1f5f9"],
-          [style*="background-color: rgb(241, 245, 249)"],
-          [style*="background-color: #f1f5f9"] {
-            background: #0f172a !important;
-            background-color: #0f172a !important;
-          }
-
-          /* হালকা ধূসর #f8fafc → সবচেয়ে গাঢ় */
-          [style*="background: rgb(248, 250, 252)"],
-          [style*="background: #f8fafc"],
-          [style*="background-color: rgb(248, 250, 252)"],
-          [style*="background-color: #f8fafc"] {
-            background: #0f172a !important;
-            background-color: #0f172a !important;
-          }
-
-          /* সাদা #ffffff → কার্ড শেড (#1e293b) */
-          [style*="background: rgb(255, 255, 255)"],
-          [style*="background: #ffffff"],
-          [style*="background: #fff"],
-          [style*="background: white"],
-          [style*="background-color: rgb(255, 255, 255)"],
-          [style*="background-color: #ffffff"],
-          [style*="background-color: #fff"],
-          [style*="background-color: white"] {
-            background: #1e293b !important;
-            background-color: #1e293b !important;
-          }
-
-          /* মাঝারি ধূসর #e2e8f0 → medium dark */
-          [style*="background: rgb(226, 232, 240)"],
-          [style*="background: #e2e8f0"],
           [style*="background-color: rgb(226, 232, 240)"],
-          [style*="background-color: #e2e8f0"] {
-            background: #334155 !important;
+          [style*="background-color: #e2e8f0"],
+          [style*="background: rgb(226, 232, 240)"],
+          [style*="background: #e2e8f0"] {
             background-color: #334155 !important;
           }
 
-          /* ============================================
-             🎨 Stat কার্ড gradient (pastel → dark)
-             ============================================ */
           [style*="rgba(59, 130, 246"] {
             background: linear-gradient(135deg, #1e3a8a, #1e40af) !important;
           }
@@ -146,40 +131,21 @@ export default function AdminApp() {
             background: linear-gradient(135deg, #7f1d1d, #991b1b) !important;
           }
 
-          /* ============================================
-             🎨 Text colors — dark → light
-             ============================================ */
           [style*="color: rgb(15, 23, 42)"],
-          [style*="color: #0f172a"] {
-            color: #f1f5f9 !important;
-          }
+          [style*="color: #0f172a"] { color: #f1f5f9 !important; }
           [style*="color: rgb(30, 41, 59)"],
-          [style*="color: #1e293b"] {
-            color: #e2e8f0 !important;
-          }
+          [style*="color: #1e293b"] { color: #e2e8f0 !important; }
           [style*="color: rgb(51, 65, 85)"],
-          [style*="color: #334155"] {
-            color: #cbd5e1 !important;
-          }
+          [style*="color: #334155"] { color: #cbd5e1 !important; }
           [style*="color: rgb(71, 85, 105)"],
-          [style*="color: #475569"] {
-            color: #cbd5e1 !important;
-          }
+          [style*="color: #475569"] { color: #cbd5e1 !important; }
           [style*="color: rgb(100, 116, 139)"],
-          [style*="color: #64748b"] {
-            color: #94a3b8 !important;
-          }
+          [style*="color: #64748b"] { color: #94a3b8 !important; }
           [style*="color: rgb(148, 163, 184)"],
-          [style*="color: #94a3b8"] {
-            color: #cbd5e1 !important;
-          }
+          [style*="color: #94a3b8"] { color: #cbd5e1 !important; }
 
-          /* ===== Headings ===== */
-          h1, h2, h3, h4, h5, h6 {
-            color: #f1f5f9 !important;
-          }
+          h1, h2, h3, h4, h5, h6 { color: #f1f5f9 !important; }
 
-          /* ===== Inputs ===== */
           input, select, textarea {
             background: #1e293b !important;
             background-color: #1e293b !important;
@@ -190,7 +156,6 @@ export default function AdminApp() {
             color: #94a3b8 !important;
           }
 
-          /* ===== Tables ===== */
           table {
             background: #1e293b !important;
             background-color: #1e293b !important;
@@ -208,7 +173,6 @@ export default function AdminApp() {
             border-color: #334155 !important;
           }
 
-          /* ===== Borders ===== */
           [style*="border: 1px solid rgb(226, 232, 240)"],
           [style*="border: 1.5px solid rgb(226, 232, 240)"],
           [style*="border: 2px solid rgb(226, 232, 240)"],
@@ -219,21 +183,17 @@ export default function AdminApp() {
             border-color: #334155 !important;
           }
 
-          /* ===== Scrollbar ===== */
-          ::-webkit-scrollbar {
-            width: 8px;
-            height: 8px;
+          [style*="border: 1px solid #f1f5f9"],
+          [style*="border-bottom: 2px solid #f1f5f9"],
+          [style*="border-bottom: 1px solid #f1f5f9"],
+          [style*="border-top: 1px solid #f1f5f9"] {
+            border-color: #1e293b !important;
           }
-          ::-webkit-scrollbar-track {
-            background: #0f172a;
-          }
-          ::-webkit-scrollbar-thumb {
-            background: #334155;
-            border-radius: 4px;
-          }
-          ::-webkit-scrollbar-thumb:hover {
-            background: #475569;
-          }
+
+          ::-webkit-scrollbar { width: 8px; height: 8px; }
+          ::-webkit-scrollbar-track { background: #0f172a; }
+          ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+          ::-webkit-scrollbar-thumb:hover { background: #475569; }
         }
       `}</style>
 
@@ -263,6 +223,10 @@ export default function AdminApp() {
           <Route path="/assignments" element={<ProtectedRoute><AssignmentManager /></ProtectedRoute>} />
           <Route path="/attendance" element={<ProtectedRoute><AttendanceManager /></ProtectedRoute>} />
           <Route path="/achievements" element={<ProtectedRoute><AchievementManager /></ProtectedRoute>} />
+
+          {/* ✅ নতুন AI Chat রুট */}
+          <Route path="/ai-chat-manager" element={<ProtectedRoute><AIChatManager /></ProtectedRoute>} />
+          <Route path="/ai-chat-logs" element={<ProtectedRoute><AIChatLogs /></ProtectedRoute>} />
 
           <Route path="/users" element={<ProtectedRoute requiredRole="super_admin"><Users /></ProtectedRoute>} />
           <Route path="/permissions" element={<ProtectedRoute requiredRole="super_admin"><Permissions /></ProtectedRoute>} />
