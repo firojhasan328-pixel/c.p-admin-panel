@@ -133,6 +133,18 @@ const getMenuItems = (role, hasPermission) => {
       label: 'অর্জন ম্যানেজার',
       permission: 'manage_achievements',
     },
+    {
+      path: '/ai-chat-manager',
+      icon: '🤖',
+      label: 'AI চ্যাট ম্যানেজার',
+      permission: 'view_dashboard',
+    },
+    {
+      path: '/ai-chat-logs',
+      icon: '💬',
+      label: 'AI চ্যাট লগ',
+      permission: 'view_dashboard',
+    },
   ];
 
   // শুধু সুপার অ্যাডমিন দেখতে পারে
@@ -216,9 +228,7 @@ export default function Sidebar({ isOpen, toggleSidebar }) {
     }
   };
 
-  // ============================================
   // রোল ব্যাজ
-  // ============================================
   const getRoleBadge = () => {
     const role = adminUser?.role;
     const badge = ROLE_BADGES[role];
@@ -232,9 +242,6 @@ export default function Sidebar({ isOpen, toggleSidebar }) {
 
   return (
     <>
-      {/* ============================================
-          সাইডবার
-          ============================================ */}
       <aside
         style={{
           ...styles.sidebar,
@@ -245,14 +252,14 @@ export default function Sidebar({ isOpen, toggleSidebar }) {
             : 'translateX(0)',
         }}
       >
-        {/* লোগো — সবসময় উপরে আটকে থাকবে */}
+        {/* লোগো */}
         <div style={styles.logo}>
           <span style={styles.logoIcon}>📚</span>
           <span style={styles.logoText}>চিলমারী</span>
           <span style={styles.logoBadge}>ADMIN</span>
         </div>
 
-        {/* ইউজার প্রোফাইল — সবসময় উপরে আটকে থাকবে */}
+        {/* ইউজার প্রোফাইল */}
         <div style={styles.profile}>
           <div style={styles.profileAvatar}>
             {adminUser?.name?.charAt(0) || 'A'}
@@ -273,9 +280,7 @@ export default function Sidebar({ isOpen, toggleSidebar }) {
           </div>
         </div>
 
-        {/* ============================================
-            মেনু — এটাই স্ক্রল হবে
-            ============================================ */}
+        {/* মেনু */}
         <nav style={styles.nav}>
           {menuItems.map((item) => {
             const isActive = location.pathname === item.path;
@@ -297,16 +302,14 @@ export default function Sidebar({ isOpen, toggleSidebar }) {
           })}
         </nav>
 
-        {/* ============================================
-            লগআউট — সবসময় নিচে আটকে থাকবে
-            ============================================ */}
+        {/* লগআউট */}
         <div style={styles.logoutSection}>
           <button onClick={logout} style={styles.logoutBtn}>
             <span>🚪</span> লগআউট
           </button>
         </div>
 
-        {/* ভার্সন — একেবারে নিচে */}
+        {/* ভার্সন */}
         <div style={styles.version}>v1.0.0</div>
       </aside>
 
@@ -465,7 +468,8 @@ const styles = {
     padding: '12px 20px',
     borderTop: '1px solid rgba(255,255,255,0.06)',
     flexShrink: 0,
-    background: 'linear-gradient(180deg, rgba(15,23,42,0.8) 0%, #1e293b 100%)',
+    background:
+      'linear-gradient(180deg, rgba(15,23,42,0.8) 0%, #1e293b 100%)',
   },
   logoutBtn: {
     width: '100%',
@@ -504,9 +508,7 @@ const styles = {
   },
 };
 
-// ============================================
-// অ্যানিমেশন ইনজেক্ট
-// ============================================
+// অ্যানিমেশন
 if (typeof document !== 'undefined') {
   const styleSheet = document.createElement('style');
   styleSheet.textContent = `
@@ -518,7 +520,6 @@ if (typeof document !== 'undefined') {
       from { opacity: 0; }
       to { opacity: 1; }
     }
-    /* সাইডবারের স্ক্রলবার মোবাইলে হালকা দেখানোর জন্য */
     aside::-webkit-scrollbar,
     nav::-webkit-scrollbar {
       width: 4px;
