@@ -25,6 +25,9 @@ export default function AIChatManager() {
     enable_whatsapp_transfer: 'true',
     welcome_subtitle: '',
     privacy_note: '',
+    chat_bot_logo_url: '',
+    chat_bot_title: '',
+    chat_bot_subtitle: '',
   });
 
   const [formData, setFormData] = useState({
@@ -443,6 +446,131 @@ export default function AIChatManager() {
       {showSettings && (
         <div style={styles.settingsPanel}>
           <h3 style={styles.settingsTitle}>⚙️ AI চ্যাট সেটিংস</h3>
+
+          {/* ============================================
+              🎨 হেডার কাস্টমাইজেশন সেকশন (নতুন)
+              ============================================ */}
+          <div style={styles.headerCustomSection}>
+            <div style={styles.sectionHeader}>
+              <span style={styles.sectionIcon}>🎨</span>
+              <span style={styles.sectionTitle}>হেডার কাস্টমাইজেশন</span>
+            </div>
+
+            <div style={styles.formGrid}>
+              <div style={styles.field}>
+                <label style={styles.label}>🖼️ লোগো URL</label>
+                <input
+                  type="url"
+                  value={settings.chat_bot_logo_url}
+                  onChange={(e) =>
+                    setSettings({ ...settings, chat_bot_logo_url: e.target.value })
+                  }
+                  placeholder="https://example.com/logo.png"
+                  style={styles.input}
+                />
+                <small style={styles.hint}>
+                  💡 ছবি অন্যত্র (postimages, imgbb) আপলোড করে সরাসরি লিংক বসান
+                </small>
+
+                {/* প্রিভিউ */}
+                {settings.chat_bot_logo_url && (
+                  <div style={styles.logoPreviewWrapper}>
+                    <span style={styles.previewLabel}>প্রিভিউ:</span>
+                    <img
+                      src={settings.chat_bot_logo_url}
+                      alt="Logo Preview"
+                      style={styles.logoPreview}
+                      onError={(e) => {
+                        e.target.style.display = 'none';
+                        e.target.nextSibling.style.display = 'block';
+                      }}
+                    />
+                    <span style={styles.previewError}>
+                      ❌ ইমেজ লোড হয়নি — URL চেক করুন
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              <div style={styles.field}>
+                <label style={styles.label}>✏️ হেডার টাইটেল</label>
+                <input
+                  type="text"
+                  value={settings.chat_bot_title}
+                  onChange={(e) =>
+                    setSettings({ ...settings, chat_bot_title: e.target.value })
+                  }
+                  placeholder="চিলমারী প্রি ক্যাডেট মাদ্রাসা"
+                  style={styles.input}
+                />
+                <small style={styles.hint}>
+                  💡 চ্যাট হেডারে যেটা দেখাবে
+                </small>
+              </div>
+
+              <div style={styles.field}>
+                <label style={styles.label}>📝 হেডার সাবটাইটেল</label>
+                <input
+                  type="text"
+                  value={settings.chat_bot_subtitle}
+                  onChange={(e) =>
+                    setSettings({ ...settings, chat_bot_subtitle: e.target.value })
+                  }
+                  placeholder="অনলাইন • সাথে সাথে উত্তর"
+                  style={styles.input}
+                />
+                <small style={styles.hint}>
+                  💡 টাইটেলের নিচে ছোট লেখা
+                </small>
+              </div>
+            </div>
+
+            {/* লাইভ প্রিভিউ */}
+            <div style={styles.headerPreviewSection}>
+              <span style={styles.previewHeaderLabel}>
+                📱 হেডার প্রিভিউ (যেভাবে দেখাবে):
+              </span>
+              <div style={styles.headerPreview}>
+                <div style={styles.headerPreviewLeft}>
+                  <div style={styles.headerPreviewAvatar}>
+                    {settings.chat_bot_logo_url ? (
+                      <img
+                        src={settings.chat_bot_logo_url}
+                        alt="Logo"
+                        style={styles.headerPreviewLogo}
+                        onError={(e) => {
+                          e.target.style.display = 'none';
+                          e.target.parentNode.innerHTML = '🏫';
+                        }}
+                      />
+                    ) : (
+                      '🏫'
+                    )}
+                  </div>
+                  <div>
+                    <div style={styles.headerPreviewTitle}>
+                      {settings.chat_bot_title || 'চিলমারী প্রি ক্যাডেট মাদ্রাসা'}
+                    </div>
+                    <div style={styles.headerPreviewSubtitle}>
+                      <span style={styles.previewOnlineDot}></span>
+                      {settings.chat_bot_subtitle || 'অনলাইন • সাথে সাথে উত্তর'}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div style={styles.sectionDivider}></div>
+
+          {/* ============================================
+              💬 মেসেজ কাস্টমাইজেশন
+              ============================================ */}
+          <div style={styles.sectionHeader}>
+            <span style={styles.sectionIcon}>💬</span>
+            <span style={styles.sectionTitle}>মেসেজ কাস্টমাইজেশন</span>
+          </div>
+
           <div style={styles.formGrid}>
             <div style={styles.field}>
               <label style={styles.label}>👋 গ্রিটিং মেসেজ</label>
@@ -485,6 +613,30 @@ export default function AIChatManager() {
             </div>
 
             <div style={styles.field}>
+              <label style={styles.label}>🔒 প্রাইভেসি নোট</label>
+              <input
+                type="text"
+                value={settings.privacy_note}
+                onChange={(e) =>
+                  setSettings({ ...settings, privacy_note: e.target.value })
+                }
+                style={styles.input}
+              />
+            </div>
+          </div>
+
+          <div style={styles.sectionDivider}></div>
+
+          {/* ============================================
+              🤖 AI কনফিগারেশন
+              ============================================ */}
+          <div style={styles.sectionHeader}>
+            <span style={styles.sectionIcon}>🤖</span>
+            <span style={styles.sectionTitle}>AI কনফিগারেশন</span>
+          </div>
+
+          <div style={styles.formGrid}>
+            <div style={styles.field}>
               <label style={styles.label}>🤖 AI মডেল</label>
               <select
                 value={settings.ai_model}
@@ -496,9 +648,6 @@ export default function AIChatManager() {
                 <option value="openai/gpt-oss-120b">⭐ GPT-OSS 120B (সেরা, বাংলা)</option>
                 <option value="openai/gpt-oss-20b">⚡ GPT-OSS 20B (দ্রুত)</option>
               </select>
-              <small style={styles.hint}>
-                💡 Groq-এর সর্বশেষ সাপোর্টেড মডেল
-              </small>
             </div>
 
             <div style={styles.field}>
@@ -523,30 +672,6 @@ export default function AIChatManager() {
             </div>
 
             <div style={styles.field}>
-              <label style={styles.label}>👋 হেডার সাবটাইটেল</label>
-              <input
-                type="text"
-                value={settings.welcome_subtitle}
-                onChange={(e) =>
-                  setSettings({ ...settings, welcome_subtitle: e.target.value })
-                }
-                style={styles.input}
-              />
-            </div>
-
-            <div style={styles.field}>
-              <label style={styles.label}>🔒 প্রাইভেসি নোট</label>
-              <input
-                type="text"
-                value={settings.privacy_note}
-                onChange={(e) =>
-                  setSettings({ ...settings, privacy_note: e.target.value })
-                }
-                style={styles.input}
-              />
-            </div>
-
-            <div style={styles.field}>
               <label style={styles.label}>💬 WhatsApp ট্রান্সফার</label>
               <select
                 value={settings.enable_whatsapp_transfer}
@@ -563,6 +688,7 @@ export default function AIChatManager() {
               </select>
             </div>
           </div>
+
           <button
             onClick={saveSettings}
             disabled={actionLoading}
@@ -954,10 +1080,127 @@ const styles = {
     border: '1px solid #e2e8f0',
   },
   settingsTitle: {
-    fontSize: '16px',
+    fontSize: '18px',
     fontWeight: '700',
     color: '#0f172a',
-    margin: '0 0 16px 0',
+    margin: '0 0 20px 0',
+    paddingBottom: '12px',
+    borderBottom: '2px solid #e2e8f0',
+  },
+  headerCustomSection: {
+    background: 'linear-gradient(135deg, #eef2ff, #f5f3ff)',
+    borderRadius: '12px',
+    padding: '18px',
+    marginBottom: '16px',
+    border: '1px solid #c7d2fe',
+  },
+  sectionHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    marginBottom: '14px',
+  },
+  sectionIcon: { fontSize: '20px' },
+  sectionTitle: {
+    fontSize: '15px',
+    fontWeight: '700',
+    color: '#4f46e5',
+    letterSpacing: '0.3px',
+  },
+  sectionDivider: {
+    height: '1px',
+    background: '#e2e8f0',
+    margin: '16px 0',
+  },
+  logoPreviewWrapper: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px',
+    padding: '10px',
+    background: 'white',
+    borderRadius: '10px',
+    marginTop: '8px',
+    border: '1px solid #e2e8f0',
+  },
+  previewLabel: {
+    fontSize: '12px',
+    fontWeight: '600',
+    color: '#64748b',
+  },
+  logoPreview: {
+    width: '48px',
+    height: '48px',
+    borderRadius: '10px',
+    objectFit: 'cover',
+    border: '2px solid #6366f1',
+    background: 'white',
+  },
+  previewError: {
+    display: 'none',
+    fontSize: '12px',
+    color: '#dc2626',
+    fontWeight: '600',
+  },
+  headerPreviewSection: {
+    marginTop: '16px',
+    paddingTop: '16px',
+    borderTop: '1px dashed #c7d2fe',
+  },
+  previewHeaderLabel: {
+    fontSize: '12px',
+    fontWeight: '700',
+    color: '#4f46e5',
+    display: 'block',
+    marginBottom: '10px',
+  },
+  headerPreview: {
+    background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+    borderRadius: '14px',
+    padding: '14px 16px',
+    color: 'white',
+  },
+  headerPreviewLeft: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+  },
+  headerPreviewAvatar: {
+    width: '46px',
+    height: '46px',
+    borderRadius: '50%',
+    background: 'rgba(255, 255, 255, 0.2)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    border: '2px solid rgba(255, 255, 255, 0.3)',
+    fontSize: '22px',
+    overflow: 'hidden',
+    flexShrink: 0,
+  },
+  headerPreviewLogo: {
+    width: '100%',
+    height: '100%',
+    objectFit: 'cover',
+  },
+  headerPreviewTitle: {
+    fontSize: '15px',
+    fontWeight: '700',
+    letterSpacing: '0.3px',
+  },
+  headerPreviewSubtitle: {
+    fontSize: '11px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '5px',
+    marginTop: '3px',
+    opacity: 0.95,
+  },
+  previewOnlineDot: {
+    width: '7px',
+    height: '7px',
+    borderRadius: '50%',
+    background: '#4ade80',
+    display: 'inline-block',
   },
   form: {
     background: '#f8fafc',
@@ -974,7 +1217,7 @@ const styles = {
   },
   formGrid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
     gap: '14px',
     marginBottom: '14px',
   },
@@ -1057,17 +1300,18 @@ const styles = {
     background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
     color: 'white',
     border: 'none',
-    padding: '10px 24px',
+    padding: '12px 24px',
     borderRadius: '10px',
     fontWeight: '600',
     cursor: 'pointer',
     fontSize: '14px',
+    boxShadow: '0 4px 12px rgba(99, 102, 241, 0.3)',
   },
   cancelBtn: {
     background: '#64748b',
     color: 'white',
     border: 'none',
-    padding: '10px 24px',
+    padding: '12px 24px',
     borderRadius: '10px',
     fontWeight: '600',
     cursor: 'pointer',
