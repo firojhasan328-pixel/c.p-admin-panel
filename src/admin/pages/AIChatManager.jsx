@@ -14,15 +14,18 @@ export default function AIChatManager() {
   const [errorMessage, setErrorMessage] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
   const [selectedIds, setSelectedIds] = useState([]);
+  const [showSettings, setShowSettings] = useState(false);
+
   const [settings, setSettings] = useState({
     greeting_message: '',
     whatsapp_number: '',
     whatsapp_default_message: '',
-    max_failed_attempts: '3',
-    ai_model: 'llama-3.3-70b-versatile',
+    ai_model: 'openai/gpt-oss-120b',
+    ai_temperature: '0.7',
     enable_whatsapp_transfer: 'true',
+    welcome_subtitle: '',
+    privacy_note: '',
   });
-  const [showSettings, setShowSettings] = useState(false);
 
   const [formData, setFormData] = useState({
     question: '',
@@ -34,21 +37,21 @@ export default function AIChatManager() {
   });
 
   const categories = [
-    { id: 'general', label: '🏫 সাধারণ' },
-    { id: 'admission', label: '🎓 ভর্তি' },
-    { id: 'fee', label: '💰 ফি' },
-    { id: 'contact', label: '📞 যোগাযোগ' },
-    { id: 'routine', label: '📅 রুটিন' },
-    { id: 'academic', label: '📚 পড়াশোনা' },
-    { id: 'religious', label: '🕌 দ্বীনি' },
-    { id: 'other', label: '📌 অন্যান্য' },
+    { id: 'general', label: '🏫 সাধারণ', color: '#64748b' },
+    { id: 'admission', label: '🎓 ভর্তি', color: '#2563eb' },
+    { id: 'fee', label: '💰 ফি', color: '#16a34a' },
+    { id: 'contact', label: '📞 যোগাযোগ', color: '#8b5cf6' },
+    { id: 'routine', label: '📅 রুটিন', color: '#f59e0b' },
+    { id: 'academic', label: '📚 পড়াশোনা', color: '#ec4899' },
+    { id: 'religious', label: '🕌 দ্বীনি', color: '#06b6d4' },
+    { id: 'other', label: '📌 অন্যান্য', color: '#94a3b8' },
   ];
 
   // ============================================
   // ডেটা লোড
   // ============================================
   useEffect(() => {
-    fetchData();
+    fetchFAQs();
     fetchSettings();
 
     const channel = supabase
@@ -56,14 +59,14 @@ export default function AIChatManager() {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'ai_chat_faqs' },
-        () => fetchData()
+        () => fetchFAQs()
       )
       .subscribe();
 
     return () => supabase.removeChannel(channel);
   }, []);
 
-  const fetchData = async () => {
+  const fetchFAQs = async () => {
     setLoading(true);
     try {
       const { data, error } = await supabase
@@ -91,7 +94,9 @@ export default function AIChatManager() {
       if (data) {
         const map = { ...settings };
         data.forEach((s) => {
-          map[s.setting_key] = s.set_value || s.setting_value;
+          if (s.setting_value !== null && s.setting_value !== undefined) {
+            map[s.setting_key] = s.setting_value;
+          }
         });
         setSettings(map);
       }
@@ -124,9 +129,7 @@ export default function AIChatManager() {
         } else {
           await supabase
             .from('ai_chat_settings')
-            .insert([
-              { setting_key: key, setting_value: value },
-            ]);
+            .insert([{ setting_key: key, setting_value: value }]);
         }
       }
 
@@ -158,7 +161,6 @@ export default function AIChatManager() {
     setSuccessMessage('');
 
     try {
-      // keywords স্ট্রিং থেকে array তে
       const keywordsArray = formData.keywords
         .split(',')
         .map((k) => k.trim())
@@ -210,7 +212,7 @@ export default function AIChatManager() {
         sort_order: 0,
       });
 
-      fetchData();
+      fetchFAQs();
     } catch (error) {
       console.error('Save error:', error);
       setErrorMessage('❌ সংরক্ষণ করতে সমস্যা: ' + error.message);
@@ -230,6 +232,7 @@ export default function AIChatManager() {
       sort_order: faq.sort_order || 0,
     });
     setShowForm(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleDelete = async (id) => {
@@ -245,7 +248,7 @@ export default function AIChatManager() {
       if (error) throw error;
       setSuccessMessage('✅ ডিলিট হয়েছে!');
       setTimeout(() => setSuccessMessage(''), 3000);
-      fetchData();
+      fetchFAQs();
     } catch (error) {
       console.error('Delete error:', error);
       setErrorMessage('❌ ডিলিট করতে সমস্যা');
@@ -269,10 +272,11 @@ export default function AIChatManager() {
         .in('id', selectedIds);
 
       if (error) throw error;
+      const count = selectedIds.length;
       setSelectedIds([]);
-      setSuccessMessage(`✅ ${selectedIds.length} টি ডিলিট হয়েছে!`);
+      setSuccessMessage(`✅ ${count} টি ডিলিট হয়েছে!`);
       setTimeout(() => setSuccessMessage(''), 3000);
-      fetchData();
+      fetchFAQs();
     } catch (error) {
       setErrorMessage('❌ বাল্ক ডিলিট সমস্যা');
       setTimeout(() => setErrorMessage(''), 3000);
@@ -300,7 +304,7 @@ export default function AIChatManager() {
         .from('ai_chat_faqs')
         .update({ is_active: !faq.is_active })
         .eq('id', faq.id);
-      fetchData();
+      fetchFAQs();
     } catch (error) {
       console.error('Toggle error:', error);
     }
@@ -329,6 +333,11 @@ export default function AIChatManager() {
   const getCategoryLabel = (cat) => {
     const c = categories.find((x) => x.id === cat);
     return c ? c.label : cat;
+  };
+
+  const getCategoryColor = (cat) => {
+    const c = categories.find((x) => x.id === cat);
+    return c ? c.color : '#64748b';
   };
 
   if (loading) {
@@ -361,7 +370,7 @@ export default function AIChatManager() {
         <div>
           <h2 style={styles.title}>🤖 AI চ্যাট ম্যানেজার</h2>
           <p style={styles.subtitle}>
-            চ্যাটবটের জন্য প্রশ্ন-উত্তর যোগ করুন — সাথে সাথে AI শিখে যাবে
+            চ্যাটবটের প্রশ্ন-উত্তর ও সেটিংস এখান থেকে ম্যানেজ করুন
           </p>
         </div>
         <div style={styles.headerActions}>
@@ -383,11 +392,50 @@ export default function AIChatManager() {
                 is_active: true,
                 sort_order: 0,
               });
+              window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
             style={styles.addBtn}
           >
             ➕ নতুন প্রশ্ন-উত্তর
           </button>
+        </div>
+      </div>
+
+      {/* স্ট্যাটিস্টিক্স */}
+      <div style={styles.statsGrid}>
+        <div style={{ ...styles.statCard, background: 'linear-gradient(135deg, #3b82f6, #2563eb)' }}>
+          <div style={styles.statIcon}>📚</div>
+          <div>
+            <div style={styles.statNumber}>{faqs.length}</div>
+            <div style={styles.statLabel}>মোট FAQ</div>
+          </div>
+        </div>
+        <div style={{ ...styles.statCard, background: 'linear-gradient(135deg, #16a34a, #15803d)' }}>
+          <div style={styles.statIcon}>✅</div>
+          <div>
+            <div style={styles.statNumber}>{faqs.filter(f => f.is_active).length}</div>
+            <div style={styles.statLabel}>সক্রিয়</div>
+          </div>
+        </div>
+        <div style={{ ...styles.statCard, background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}>
+          <div style={styles.statIcon}>🤖</div>
+          <div>
+            <div style={{ ...styles.statNumber, fontSize: '14px' }}>
+              {settings.ai_model === 'openai/gpt-oss-120b' ? 'GPT-OSS 120B' :
+               settings.ai_model === 'openai/gpt-oss-20b' ? 'GPT-OSS 20B' :
+               settings.ai_model}
+            </div>
+            <div style={styles.statLabel}>AI মডেল</div>
+          </div>
+        </div>
+        <div style={{ ...styles.statCard, background: 'linear-gradient(135deg, #8b5cf6, #7c3aed)' }}>
+          <div style={styles.statIcon}>📱</div>
+          <div>
+            <div style={{ ...styles.statNumber, fontSize: '12px', fontFamily: 'monospace' }}>
+              {settings.whatsapp_number || '—'}
+            </div>
+            <div style={styles.statLabel}>WhatsApp</div>
+          </div>
         </div>
       </div>
 
@@ -407,6 +455,7 @@ export default function AIChatManager() {
                 style={styles.textarea}
               />
             </div>
+
             <div style={styles.field}>
               <label style={styles.label}>📱 WhatsApp নাম্বার</label>
               <input
@@ -419,10 +468,10 @@ export default function AIChatManager() {
                 style={styles.input}
               />
             </div>
+
             <div style={styles.field}>
               <label style={styles.label}>💬 WhatsApp ডিফল্ট মেসেজ</label>
-              <input
-                type="text"
+              <textarea
                 value={settings.whatsapp_default_message}
                 onChange={(e) =>
                   setSettings({
@@ -430,9 +479,11 @@ export default function AIChatManager() {
                     whatsapp_default_message: e.target.value,
                   })
                 }
-                style={styles.input}
+                rows="2"
+                style={styles.textarea}
               />
             </div>
+
             <div style={styles.field}>
               <label style={styles.label}>🤖 AI মডেল</label>
               <select
@@ -442,9 +493,73 @@ export default function AIChatManager() {
                 }
                 style={styles.input}
               >
-                <option value="llama-3.3-70b-versatile">Llama 3.3 70B (সেরা)</option>
-                <option value="llama-3.1-8b-instant">Llama 3.1 8B (দ্রুত)</option>
-                <option value="mixtral-8x7b-32768">Mixtral 8x7B</option>
+                <option value="openai/gpt-oss-120b">⭐ GPT-OSS 120B (সেরা, বাংলা)</option>
+                <option value="openai/gpt-oss-20b">⚡ GPT-OSS 20B (দ্রুত)</option>
+              </select>
+              <small style={styles.hint}>
+                💡 Groq-এর সর্বশেষ সাপোর্টেড মডেল
+              </small>
+            </div>
+
+            <div style={styles.field}>
+              <label style={styles.label}>
+                🎨 AI ক্রিয়েটিভিটি: {settings.ai_temperature}
+              </label>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.1"
+                value={settings.ai_temperature}
+                onChange={(e) =>
+                  setSettings({ ...settings, ai_temperature: e.target.value })
+                }
+                style={styles.rangeInput}
+              />
+              <div style={styles.rangeLabels}>
+                <span>🎯 নির্ভুল</span>
+                <span>🎨 ক্রিয়েটিভ</span>
+              </div>
+            </div>
+
+            <div style={styles.field}>
+              <label style={styles.label}>👋 হেডার সাবটাইটেল</label>
+              <input
+                type="text"
+                value={settings.welcome_subtitle}
+                onChange={(e) =>
+                  setSettings({ ...settings, welcome_subtitle: e.target.value })
+                }
+                style={styles.input}
+              />
+            </div>
+
+            <div style={styles.field}>
+              <label style={styles.label}>🔒 প্রাইভেসি নোট</label>
+              <input
+                type="text"
+                value={settings.privacy_note}
+                onChange={(e) =>
+                  setSettings({ ...settings, privacy_note: e.target.value })
+                }
+                style={styles.input}
+              />
+            </div>
+
+            <div style={styles.field}>
+              <label style={styles.label}>💬 WhatsApp ট্রান্সফার</label>
+              <select
+                value={settings.enable_whatsapp_transfer}
+                onChange={(e) =>
+                  setSettings({
+                    ...settings,
+                    enable_whatsapp_transfer: e.target.value,
+                  })
+                }
+                style={styles.input}
+              >
+                <option value="true">✅ চালু</option>
+                <option value="false">❌ বন্ধ</option>
               </select>
             </div>
           </div>
@@ -458,7 +573,7 @@ export default function AIChatManager() {
         </div>
       )}
 
-      {/* ফর্ম */}
+      {/* FAQ ফর্ম */}
       {showForm && (
         <form onSubmit={handleSubmit} style={styles.form}>
           <h3 style={styles.formTitle}>
@@ -597,7 +712,7 @@ export default function AIChatManager() {
         <span style={styles.resultCount}>{filteredData.length} টি</span>
       </div>
 
-      {/* টেবিল */}
+      {/* FAQ টেবিল */}
       {filteredData.length === 0 ? (
         <div style={styles.emptyState}>
           <span style={styles.emptyIcon}>📭</span>
@@ -620,7 +735,7 @@ export default function AIChatManager() {
                   />
                 </th>
                 <th style={styles.th}>প্রশ্ন</th>
-                <th style={styles.th}>উত্তর (সংক্ষেপ)</th>
+                <th style={styles.th}>উত্তর</th>
                 <th style={styles.th}>ক্যাটাগরি</th>
                 <th style={styles.th}>কীওয়ার্ড</th>
                 <th style={styles.th}>স্ট্যাটাস</th>
@@ -643,19 +758,25 @@ export default function AIChatManager() {
                   </td>
                   <td style={styles.td}>
                     <span style={styles.answerPreview}>
-                      {faq.answer?.substring(0, 60)}
-                      {faq.answer?.length > 60 ? '...' : ''}
+                      {faq.answer?.substring(0, 80)}
+                      {faq.answer?.length > 80 ? '...' : ''}
                     </span>
                   </td>
                   <td style={styles.td}>
-                    <span style={styles.categoryBadge}>
+                    <span
+                      style={{
+                        ...styles.categoryBadge,
+                        background: getCategoryColor(faq.category) + '20',
+                        color: getCategoryColor(faq.category),
+                      }}
+                    >
                       {getCategoryLabel(faq.category)}
                     </span>
                   </td>
                   <td style={styles.td}>
                     <span style={styles.keywordsText}>
                       {(faq.keywords || []).slice(0, 3).join(', ')}
-                      {(faq.keywords || []).length > 3 ? '...' : ''}
+                      {(faq.keywords || []).length > 3 ? ` +${faq.keywords.length - 3}` : ''}
                     </span>
                   </td>
                   <td style={styles.td}>
@@ -718,7 +839,7 @@ const styles = {
     width: '48px',
     height: '48px',
     border: '4px solid #e2e8f0',
-    borderTop: '4px solid #16a34a',
+    borderTop: '4px solid #6366f1',
     borderRadius: '50%',
     animation: 'spin 1s linear infinite',
   },
@@ -796,7 +917,7 @@ const styles = {
     fontSize: '14px',
   },
   addBtn: {
-    background: 'linear-gradient(135deg, #16a34a, #15803d)',
+    background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
     color: 'white',
     border: 'none',
     padding: '10px 20px',
@@ -804,8 +925,27 @@ const styles = {
     fontWeight: '600',
     cursor: 'pointer',
     fontSize: '14px',
-    boxShadow: '0 4px 12px rgba(22,163,74,0.3)',
+    boxShadow: '0 4px 12px rgba(99, 102, 241, 0.3)',
   },
+  statsGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+    gap: '14px',
+    marginBottom: '20px',
+  },
+  statCard: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '14px',
+    padding: '16px 20px',
+    borderRadius: '14px',
+    color: 'white',
+    boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+    minHeight: '70px',
+  },
+  statIcon: { fontSize: '26px' },
+  statNumber: { fontSize: '22px', fontWeight: '800', lineHeight: 1.2 },
+  statLabel: { fontSize: '12px', opacity: 0.9, fontWeight: '500' },
   settingsPanel: {
     background: '#f8fafc',
     padding: '20px',
@@ -882,6 +1022,16 @@ const styles = {
     fontFamily: 'inherit',
     resize: 'vertical',
   },
+  rangeInput: {
+    width: '100%',
+    accentColor: '#6366f1',
+  },
+  rangeLabels: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    fontSize: '11px',
+    color: '#94a3b8',
+  },
   checkboxLabel: {
     display: 'flex',
     alignItems: 'center',
@@ -896,7 +1046,7 @@ const styles = {
     width: '18px',
     height: '18px',
     cursor: 'pointer',
-    accentColor: '#16a34a',
+    accentColor: '#6366f1',
   },
   formActions: {
     display: 'flex',
@@ -904,7 +1054,7 @@ const styles = {
     marginTop: '10px',
   },
   saveBtn: {
-    background: 'linear-gradient(135deg, #16a34a, #15803d)',
+    background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
     color: 'white',
     border: 'none',
     padding: '10px 24px',
@@ -1013,8 +1163,6 @@ const styles = {
     color: '#64748b',
   },
   categoryBadge: {
-    background: '#dbeafe',
-    color: '#2563eb',
     padding: '3px 10px',
     borderRadius: '12px',
     fontSize: '11px',
@@ -1053,13 +1201,11 @@ const styles = {
   },
 };
 
-if (typeof document !== 'undefined') {
-  const styleSheet = document.createElement('style');
-  styleSheet.textContent = `
-    @keyframes spin {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
-    }
-  `;
-  document.head.appendChild(styleSheet);
-}
+const styleSheet = document.createElement('style');
+styleSheet.textContent = `
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+`;
+document.head.appendChild(styleSheet);
