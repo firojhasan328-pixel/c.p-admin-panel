@@ -114,11 +114,7 @@ export default function AIChatLogs() {
     if (!confirm('এই সেশন এবং সব মেসেজ ডিলিট করতে চান?')) return;
 
     try {
-      await supabase
-        .from('ai_chat_messages')
-        .delete()
-        .eq('session_id', sessionId);
-
+      await supabase.from('ai_chat_messages').delete().eq('session_id', sessionId);
       await supabase.from('ai_chat_sessions').delete().eq('id', sessionId);
 
       if (selectedSession?.id === sessionId) {
@@ -149,10 +145,19 @@ export default function AIChatLogs() {
 
   const handleClearAll = async () => {
     if (!confirm('⚠️ সব চ্যাট সেশন ডিলিট করতে চান? এটা ফিরিয়ে আনা যাবে না!')) return;
-    if (!confirm('আপনি কি নিশ্চিত?')) return;
+    if (!confirm('আপনি কি একেবারে নিশ্চিত?')) return;
 
     try {
-      await supabase.from('ai_chat_messages').delete().neq('id', 0);
+      const { data: allSessions } = await supabase
+        .from('ai_chat_sessions')
+        .select('id');
+
+      if (allSessions) {
+        for (const s of allSessions) {
+          await supabase.from('ai_chat_messages').delete().eq('session_id', s.id);
+        }
+      }
+
       await supabase.from('ai_chat_sessions').delete().neq('id', '00000000-0000-0000-0000-000000000000');
 
       setSelectedSession(null);
@@ -170,7 +175,8 @@ export default function AIChatLogs() {
 
     if (searchTerm) {
       filtered = filtered.filter((s) =>
-        s.session_token?.toLowerCase().includes(searchTerm.toLowerCase())
+        s.session_token?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        s.last_message?.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
 
@@ -217,7 +223,7 @@ export default function AIChatLogs() {
 
       {/* স্ট্যাট কার্ড */}
       <div style={styles.statsGrid}>
-        <div style={{ ...styles.statCard, background: 'linear-gradient(135deg, #3b82f6, #2563eb)' }}>
+        <div style={{ ...styles.statCard, background: 'linear-gradient(135deg, #6366f1, #4f46e5)' }}>
           <div style={styles.statIcon}>💬</div>
           <div>
             <div style={styles.statNumber}>{stats.totalSessions}</div>
@@ -254,7 +260,7 @@ export default function AIChatLogs() {
           <div style={styles.filterBar}>
             <input
               type="text"
-              placeholder="🔍 সেশন ID..."
+              placeholder="🔍 সেশন ID বা মেসেজ..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               style={styles.searchInput}
@@ -292,7 +298,7 @@ export default function AIChatLogs() {
                 >
                   <div style={styles.sessionRow}>
                     <span style={styles.sessionToken}>
-                      {session.session_token?.substring(0, 12)}...
+                      {session.session_token?.substring(0, 14)}...
                     </span>
                     {session.is_transferred_to_whatsapp && (
                       <span style={styles.transferBadge}>📞</span>
@@ -301,6 +307,12 @@ export default function AIChatLogs() {
                       <span style={styles.archiveBadge}>📦</span>
                     )}
                   </div>
+                  {session.last_message && (
+                    <div style={styles.lastMessage}>
+                      {session.last_message.substring(0, 50)}
+                      {session.last_message.length > 50 ? '...' : ''}
+                    </div>
+                  )}
                   <div style={styles.sessionMeta}>
                     <span>💬 {session.message_count || 0} মেসেজ</span>
                     <span>🕐 {formatTime(session.updated_at)}</span>
@@ -370,7 +382,17 @@ export default function AIChatLogs() {
                         )}
                       </div>
                       <div style={styles.messageContent}>{msg.content}</div>
-                      <div style={styles.messageTime}>{formatTime(msg.created_at)}</div>
+                      <div style={styles.messageFooter}>
+                        <span style={styles.messageTime}>{formatTime(msg.created_at)}</span>
+                        {msg.ai_model && msg.role === 'assistant' && (
+                          <span style={styles.modelBadge}>
+                            {msg.ai_model.includes('120b') ? 'GPT-120B' :
+                             msg.ai_model.includes('20b') ? 'GPT-20B' :
+                             msg.ai_model}
+                            {msg.response_time_ms ? ` • ${msg.response_time_ms}ms` : ''}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   ))
                 )}
@@ -383,9 +405,6 @@ export default function AIChatLogs() {
   );
 }
 
-// ============================================
-// স্টাইল
-// ============================================
 const styles = {
   container: {
     maxWidth: '1400px',
@@ -442,7 +461,7 @@ const styles = {
   statLabel: { fontSize: '12px', opacity: 0.9 },
   splitView: {
     display: 'grid',
-    gridTemplateColumns: '350px 1fr',
+    gridTemplateColumns: 'minmax(280px, 350px) 1fr',
     gap: '16px',
     minHeight: '500px',
   },
@@ -453,7 +472,7 @@ const styles = {
     padding: '14px',
     display: 'flex',
     flexDirection: 'column',
-    maxHeight: '70vh',
+    maxHeight: '75vh',
   },
   filterBar: {
     display: 'flex',
@@ -503,8 +522,8 @@ const styles = {
     background: 'white',
   },
   sessionItemActive: {
-    background: '#f0fdf4',
-    borderColor: '#16a34a',
+    background: '#eef2ff',
+    borderColor: '#6366f1',
   },
   sessionRow: {
     display: 'flex',
@@ -521,6 +540,12 @@ const styles = {
   },
   transferBadge: { fontSize: '14px' },
   archiveBadge: { fontSize: '12px' },
+  lastMessage: {
+    fontSize: '11px',
+    color: '#64748b',
+    marginBottom: '4px',
+    fontStyle: 'italic',
+  },
   sessionMeta: {
     display: 'flex',
     justifyContent: 'space-between',
@@ -533,7 +558,7 @@ const styles = {
     border: '1px solid #e2e8f0',
     display: 'flex',
     flexDirection: 'column',
-    maxHeight: '70vh',
+    maxHeight: '75vh',
     overflow: 'hidden',
   },
   emptyPanel: {
@@ -603,7 +628,7 @@ const styles = {
   },
   userMessage: {
     alignSelf: 'flex-end',
-    background: 'linear-gradient(135deg, #16a34a, #15803d)',
+    background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
     color: 'white',
     borderBottomRightRadius: '4px',
   },
@@ -634,11 +659,24 @@ const styles = {
     whiteSpace: 'pre-wrap',
     wordBreak: 'break-word',
   },
+  messageFooter: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: '8px',
+    marginTop: '6px',
+  },
   messageTime: {
     fontSize: '10px',
     opacity: 0.7,
-    marginTop: '4px',
-    textAlign: 'right',
+  },
+  modelBadge: {
+    fontSize: '10px',
+    background: 'rgba(99, 102, 241, 0.15)',
+    color: '#6366f1',
+    padding: '1px 8px',
+    borderRadius: '8px',
+    fontWeight: '600',
   },
   loadingState: {
     textAlign: 'center',
@@ -655,9 +693,12 @@ const styles = {
     display: 'block',
     marginBottom: '12px',
   },
-  '@media (max-width: 768px)': {
-    splitView: {
-      gridTemplateColumns: '1fr',
-    },
-  },
 };
+
+const styleSheet = document.createElement('style');
+styleSheet.textContent = `
+  @media (max-width: 768px) {
+    .split-view { grid-template-columns: 1fr !important; }
+  }
+`;
+document.head.appendChild(styleSheet);
